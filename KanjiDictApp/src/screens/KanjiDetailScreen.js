@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Share, Platform, Clipboard, Animated,
+  Share, Platform, Clipboard, Animated, Dimensions,
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import JLPTBadge from '../components/JLPTBadge';
@@ -101,10 +101,11 @@ export default function KanjiDetailScreen({ route, navigation }) {
     : [];
 
   return (
+    <View style={[styles.screenRoot, { backgroundColor: theme.background }]}>
     <ScrollView
-      style={[styles.container, { backgroundColor: theme.background }]}
+      style={styles.container}
       contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
+      showsVerticalScrollIndicator={Platform.OS !== 'web'}
     >
       {/* Hero section */}
       <View style={[styles.hero, { backgroundColor: theme.surface, borderColor: theme.border }]}>
@@ -233,6 +234,7 @@ export default function KanjiDetailScreen({ route, navigation }) {
 
       <View style={{ height: 40 }} />
     </ScrollView>
+    </View>
   );
 }
 
@@ -257,6 +259,9 @@ function InfoRow({ label, value, theme }) {
 }
 
 const styles = StyleSheet.create({
+  screenRoot: Platform.OS === 'web'
+    ? { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }
+    : { flex: 1 },
   container: { flex: 1 },
   content: { paddingBottom: 20 },
   hero: {

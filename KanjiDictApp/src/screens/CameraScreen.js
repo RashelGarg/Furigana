@@ -5,26 +5,28 @@ import {
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { extractKanji, lookupKanji } from '../utils/kanjiUtils';
+import FuriganaText from '../components/FuriganaText';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
-/**
- * Camera Screen
- * - Web: uses webcam + canvas for frame capture + Tesseract OCR
- * - Shows detected kanji with furigana overlays
- */
 export default function CameraScreen({ navigation }) {
   const { theme } = useTheme();
-  const [mode, setMode] = useState('camera'); // 'camera' | 'paste'
-  const [pasteText, setPasteText] = useState('');
+  const [mode, setMode] = useState('camera');
   const [detectedKanji, setDetectedKanji] = useState([]);
   const [scanning, setScanning] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const [inputText, setInputText] = useState('');
+  const [frozen, setFrozen] = useState(false);
+  const [ocrProgress, setOcrProgress] = useState(null); // 0-100 or null
+  const [sourceText, setSourceText] = useState(''); // full text for furigana display
+
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
   const ocrIntervalRef = useRef(null);
+  // Use refs for flags so interval callbacks always see current values (no stale closures)
+  const scanningRef = useRef(false);
+  const frozenRef = useRef(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -51,47 +53,124 @@ export default function CameraScreen({ navigation }) {
 
   const stopCamera = () => {
     clearInterval(ocrIntervalRef.current);
+    ocrIntervalRef.current = null;
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
     }
+    scanningRef.current = false;
+    frozenRef.current = false;
+    setScanning(false);
+    setFrozen(false);
+    setOcrProgress(null);
     setCameraActive(false);
   };
 
-  const captureAndOCR = useCallback(async () => {
-    if (!videoRef.current || !canvasRef.current || scanning) return;
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (video.videoWidth === 0) return;
-
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0);
-
+  // Core OCR function — reads from whichever canvas content was drawn last.
+  // Uses refs (not state) for guards so interval always sees fresh values.
+  const runOCR = useCallback(async (canvas) => {
+    if (scanningRef.current) return;
+    scanningRef.current = true;
     setScanning(true);
+    setOcrProgress(0);
     try {
-      // Dynamically load Tesseract to avoid SSR issues
-      const Tesseract = (await import('tesseract.js')).default;
-      const { data: { text } } = await Tesseract.recognize(canvas, 'jpn', {
-        logger: () => {},
+      const { createWorker } = await import('tesseract.js');
+      const worker = await createWorker('jpn', 1, {
+        logger: (m) => {
+          if (m.status === 'recognizing text') {
+            setOcrProgress(Math.round(m.progress * 100));
+          }
+        },
       });
-      const kanji = extractKanji(text);
+      // Preprocessing: draw greyscale version of the image to improve OCR accuracy
+      const tmpCanvas = document.createElement('canvas');
+      tmpCanvas.width = canvas.width;
+      tmpCanvas.height = canvas.height;
+      const ctx = tmpCanvas.getContext('2d');
+      ctx.drawImage(canvas, 0, 0);
+      // Greyscale + contrast boost
+      const imgData = ctx.getImageData(0, 0, tmpCanvas.width, tmpCanvas.height);
+      const d = imgData.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const grey = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+        // Simple contrast stretch: push dark pixels darker, light pixels lighter
+        const contrast = Math.min(255, Math.max(0, (grey - 128) * 1.4 + 128));
+        d[i] = d[i + 1] = d[i + 2] = contrast;
+      }
+      ctx.putImageData(imgData, 0, 0);
+
+      const { data } = await worker.recognize(tmpCanvas);
+      await worker.terminate();
+
+      // Filter words by confidence > 60 and extract kanji characters
+      const highConfText = (data.words || [])
+        .filter(w => w.confidence > 60)
+        .map(w => w.text)
+        .join('');
+
+      const bestText = highConfText.length > 0 ? highConfText : data.text;
+      const kanji = extractKanji(bestText);
       if (kanji.length > 0) {
         const entries = kanji.map(k => lookupKanji(k)).filter(Boolean);
-        setDetectedKanji(entries);
+        if (entries.length > 0) {
+          setDetectedKanji(entries);
+          setSourceText(bestText.trim());
+        }
       }
     } catch (e) {
       console.error('OCR error:', e);
     } finally {
+      scanningRef.current = false;
       setScanning(false);
+      setOcrProgress(null);
     }
-  }, [scanning]);
+  }, []);
 
-  const startOCR = () => {
-    ocrIntervalRef.current = setInterval(captureAndOCR, 4000);
-    captureAndOCR();
-  };
+  // Periodic auto-scan: captures a frame and runs OCR (skipped if frozen or already scanning)
+  const autoCapture = useCallback(() => {
+    if (frozenRef.current || scanningRef.current) return;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || video.videoWidth === 0) return;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    runOCR(canvas);
+  }, [runOCR]);
+
+  const startOCR = useCallback(() => {
+    clearInterval(ocrIntervalRef.current);
+    // Run once immediately, then every 6s
+    autoCapture();
+    ocrIntervalRef.current = setInterval(autoCapture, 6000);
+  }, [autoCapture]);
+
+  // "Capture Now": freeze the live video, show the snapshot, then OCR it
+  const freezeAndOCR = useCallback(async () => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || video.videoWidth === 0) return;
+    // Stop auto-scan interval while frozen
+    clearInterval(ocrIntervalRef.current);
+    // Draw current frame to canvas and show it
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    frozenRef.current = true;
+    setFrozen(true);
+    // Pause live video
+    video.pause();
+    // OCR the frozen frame
+    await runOCR(canvas);
+  }, [runOCR]);
+
+  // "Resume": unfreeze, restart live stream and interval
+  const resumeCamera = useCallback(() => {
+    frozenRef.current = false;
+    setFrozen(false);
+    if (videoRef.current) videoRef.current.play();
+    startOCR();
+  }, [startOCR]);
 
   const handleAnalyzeText = () => {
     const text = inputText.trim();
@@ -99,13 +178,13 @@ export default function CameraScreen({ navigation }) {
     const kanji = extractKanji(text);
     const entries = kanji.map(k => lookupKanji(k)).filter(Boolean);
     setDetectedKanji(entries);
+    setSourceText(text);
   };
 
   const openDetail = (entry) => {
     navigation.navigate('KanjiDetail', { entry });
   };
 
-  // For demo Japanese text
   const DEMO_TEXTS = [
     '東京大学で日本語を勉強しています。',
     '今日は天気がとても良いです。',
@@ -113,15 +192,13 @@ export default function CameraScreen({ navigation }) {
     '日本の文化は世界中で有名です。',
   ];
 
-  const [demoIndex, setDemoIndex] = useState(0);
-
   return (
     <Animated.View style={[styles.container, { backgroundColor: theme.background, opacity: fadeAnim }]}>
       {/* Mode tabs */}
       <View style={[styles.modeTabs, { backgroundColor: theme.surface, borderColor: theme.border }]}>
         <TouchableOpacity
           style={[styles.modeTab, mode === 'camera' && { backgroundColor: theme.primary }]}
-          onPress={() => { setMode('camera'); setDetectedKanji([]); }}
+          onPress={() => { setMode('camera'); setDetectedKanji([]); setSourceText(''); }}
         >
           <Text style={[styles.modeTabText, { color: mode === 'camera' ? '#FFF' : theme.textSecondary }]}>
             📷 Camera OCR
@@ -129,7 +206,7 @@ export default function CameraScreen({ navigation }) {
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.modeTab, mode === 'text' && { backgroundColor: theme.primary }]}
-          onPress={() => { setMode('text'); stopCamera(); setDetectedKanji([]); }}
+          onPress={() => { setMode('text'); stopCamera(); setDetectedKanji([]); setSourceText(''); }}
         >
           <Text style={[styles.modeTabText, { color: mode === 'text' ? '#FFF' : theme.textSecondary }]}>
             ✍️ Text Input
@@ -140,8 +217,9 @@ export default function CameraScreen({ navigation }) {
       {/* Camera mode */}
       {mode === 'camera' && Platform.OS === 'web' && (
         <View style={styles.cameraSection}>
-          {/* Video preview */}
+          {/* Video / frozen canvas preview */}
           <View style={[styles.videoWrapper, { backgroundColor: '#000', borderColor: theme.border }]}>
+            {/* Live video — hidden when frozen */}
             <video
               ref={videoRef}
               style={{
@@ -149,12 +227,22 @@ export default function CameraScreen({ navigation }) {
                 maxHeight: 280,
                 objectFit: 'cover',
                 borderRadius: 12,
-                display: cameraActive ? 'block' : 'none',
+                display: cameraActive && !frozen ? 'block' : 'none',
               }}
               playsInline
               muted
             />
-            <canvas ref={canvasRef} style={{ display: 'none' }} />
+            {/* Frozen snapshot canvas — shown when frozen */}
+            <canvas
+              ref={canvasRef}
+              style={{
+                display: frozen ? 'block' : 'none',
+                width: '100%',
+                maxHeight: 280,
+                objectFit: 'cover',
+                borderRadius: 12,
+              }}
+            />
             {!cameraActive && (
               <View style={styles.cameraPlaceholder}>
                 <Text style={styles.cameraIcon}>📷</Text>
@@ -166,10 +254,19 @@ export default function CameraScreen({ navigation }) {
                 </Text>
               </View>
             )}
+            {/* Frozen badge */}
+            {frozen && (
+              <View style={styles.frozenBadge}>
+                <Text style={styles.frozenBadgeText}>📸 Frozen</Text>
+              </View>
+            )}
+            {/* Scanning overlay with progress */}
             {scanning && (
               <View style={styles.scanningOverlay}>
                 <ActivityIndicator size="small" color="#FFF" />
-                <Text style={styles.scanningText}>Scanning...</Text>
+                <Text style={styles.scanningText}>
+                  {ocrProgress !== null ? `${ocrProgress}%` : 'Loading OCR…'}
+                </Text>
               </View>
             )}
           </View>
@@ -179,15 +276,23 @@ export default function CameraScreen({ navigation }) {
             {!cameraActive ? (
               <TouchableOpacity
                 style={[styles.bigBtn, { backgroundColor: theme.primary }]}
-                onPress={() => { startCamera().then(startOCR); }}
+                onPress={() => startCamera().then(startOCR)}
               >
                 <Text style={styles.bigBtnText}>Start Camera</Text>
+              </TouchableOpacity>
+            ) : frozen ? (
+              /* Frozen state: show Resume button */
+              <TouchableOpacity
+                style={[styles.bigBtn, { backgroundColor: theme.accent }]}
+                onPress={resumeCamera}
+              >
+                <Text style={styles.bigBtnText}>▶ Resume Camera</Text>
               </TouchableOpacity>
             ) : (
               <View style={styles.cameraActiveControls}>
                 <TouchableOpacity
                   style={[styles.controlBtn, { backgroundColor: theme.accent }]}
-                  onPress={captureAndOCR}
+                  onPress={freezeAndOCR}
                   disabled={scanning}
                 >
                   <Text style={styles.controlBtnText}>📸 Capture Now</Text>
@@ -210,7 +315,6 @@ export default function CameraScreen({ navigation }) {
           <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
             Paste or type Japanese text to extract kanji:
           </Text>
-          {/* Demo texts */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.demoScroll}>
             {DEMO_TEXTS.map((text, i) => (
               <TouchableOpacity
@@ -256,41 +360,53 @@ export default function CameraScreen({ navigation }) {
         </View>
       )}
 
-      {/* Detected kanji results */}
+      {/* Results: furigana text + kanji tiles */}
       {detectedKanji.length > 0 && (
-        <View style={styles.resultsSection}>
-          <Text style={[styles.resultsTitle, { color: theme.text }]}>
-            Detected Kanji ({detectedKanji.length})
-          </Text>
-          <ScrollView style={styles.resultsList} showsVerticalScrollIndicator={false}>
-            <View style={styles.kanjiGrid}>
-              {detectedKanji.map((entry) => (
-                <TouchableOpacity
-                  key={entry.kanji}
-                  style={[styles.kanjiTile, { backgroundColor: theme.surface, borderColor: theme.border }]}
-                  onPress={() => openDetail(entry)}
-                >
-                  <Text style={[styles.tileKanji, { color: theme.text }]}>{entry.kanji}</Text>
-                  <Text style={[styles.tileFuri, { color: theme.furigana }]}>
-                    {entry.kunyomi?.[0] || entry.onyomi?.[0] || ''}
-                  </Text>
-                  <Text style={[styles.tileMeaning, { color: theme.textSecondary }]} numberOfLines={1}>
-                    {entry.meanings?.[0] || ''}
-                  </Text>
-                  {entry.jlptLevel && (
-                    <View style={[styles.tileJLPT, { backgroundColor: theme.jlptColors[entry.jlptLevel] }]}>
-                      <Text style={styles.tileJLPTText}>{entry.jlptLevel}</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
+        <ScrollView style={styles.resultsSection} showsVerticalScrollIndicator={false}>
+          {/* ── Furigana text block ── */}
+          {sourceText.length > 0 && (
+            <View style={[styles.furiganaCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <Text style={[styles.furiganaLabel, { color: theme.textSecondary }]}>Furigana</Text>
+              <FuriganaText
+                text={sourceText}
+                fontSize={22}
+                color={theme.text}
+                rtColor={theme.primary}
+              />
             </View>
-            <View style={{ height: 20 }} />
-          </ScrollView>
-        </View>
+          )}
+
+          {/* ── Individual kanji tiles ── */}
+          <Text style={[styles.resultsTitle, { color: theme.text }]}>
+            Kanji ({detectedKanji.length}) — tap for details
+          </Text>
+          <View style={styles.kanjiGrid}>
+            {detectedKanji.map((entry) => (
+              <TouchableOpacity
+                key={entry.kanji}
+                style={[styles.kanjiTile, { backgroundColor: theme.surface, borderColor: theme.border }]}
+                onPress={() => openDetail(entry)}
+              >
+                <Text style={[styles.tileKanji, { color: theme.text }]}>{entry.kanji}</Text>
+                <Text style={[styles.tileFuri, { color: theme.primary }]}>
+                  {entry.kunyomi?.[0]?.split('.')[0] || entry.onyomi?.[0] || ''}
+                </Text>
+                <Text style={[styles.tileMeaning, { color: theme.textSecondary }]} numberOfLines={1}>
+                  {entry.meanings?.[0] || ''}
+                </Text>
+                {entry.jlptLevel && (
+                  <View style={[styles.tileJLPT, { backgroundColor: theme.jlptColors[entry.jlptLevel] }]}>
+                    <Text style={styles.tileJLPTText}>{entry.jlptLevel}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+          <View style={{ height: 40 }} />
+        </ScrollView>
       )}
 
-      {detectedKanji.length === 0 && (
+      {detectedKanji.length === 0 && !scanning && (
         <View style={styles.hintSection}>
           <Text style={[styles.hintTitle, { color: theme.textTertiary }]}>漢字辞書</Text>
           <Text style={[styles.hintText, { color: theme.textSecondary }]}>
@@ -305,6 +421,19 @@ export default function CameraScreen({ navigation }) {
               </View>
             ))}
           </View>
+        </View>
+      )}
+
+      {/* Full-screen scanning state (first OCR, before any results) */}
+      {detectedKanji.length === 0 && scanning && (
+        <View style={styles.hintSection}>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.hintText, { color: theme.textSecondary, marginTop: 16 }]}>
+            {ocrProgress !== null ? `Recognizing text… ${ocrProgress}%` : 'Loading Japanese OCR engine…'}
+          </Text>
+          <Text style={[styles.hintTextSub, { color: theme.textTertiary }]}>
+            First run downloads the language pack (~20 MB)
+          </Text>
         </View>
       )}
     </Animated.View>
@@ -335,11 +464,22 @@ const styles = StyleSheet.create({
     minHeight: 200,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
   },
   cameraPlaceholder: { alignItems: 'center', padding: 40 },
   cameraIcon: { fontSize: 48, marginBottom: 12 },
   cameraHint: { fontSize: 15, fontWeight: '600', marginBottom: 4 },
   cameraHintSub: { fontSize: 13, textAlign: 'center' },
+  frozenBadge: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  frozenBadgeText: { color: '#FFF', fontSize: 12, fontWeight: '600' },
   scanningOverlay: {
     position: 'absolute',
     bottom: 10,
@@ -352,7 +492,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     gap: 6,
   },
-  scanningText: { color: '#FFF', fontSize: 12 },
+  scanningText: { color: '#FFF', fontSize: 12, fontWeight: '600' },
   cameraControls: { marginTop: 12 },
   bigBtn: {
     borderRadius: 12,
@@ -386,9 +526,21 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   analyzeBtnText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
-  resultsSection: { flex: 1, paddingHorizontal: 12, paddingTop: 12 },
-  resultsTitle: { fontSize: 16, fontWeight: '700', marginBottom: 10 },
-  resultsList: { flex: 1 },
+  resultsSection: { flex: 1, paddingHorizontal: 12, paddingTop: 8 },
+  furiganaCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 16,
+  },
+  furiganaLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+  },
+  resultsTitle: { fontSize: 13, fontWeight: '600', marginBottom: 10, opacity: 0.7 },
   kanjiGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -419,7 +571,8 @@ const styles = StyleSheet.create({
   tileJLPTText: { color: '#FFF', fontSize: 8, fontWeight: '700' },
   hintSection: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 30 },
   hintTitle: { fontSize: 56, marginBottom: 16 },
-  hintText: { fontSize: 15, textAlign: 'center', lineHeight: 22, marginBottom: 24 },
+  hintText: { fontSize: 15, textAlign: 'center', lineHeight: 22, marginBottom: 8 },
+  hintTextSub: { fontSize: 12, textAlign: 'center', marginBottom: 24 },
   featurePills: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
   pill: {
     paddingHorizontal: 12,
