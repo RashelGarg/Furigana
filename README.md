@@ -30,34 +30,36 @@ The app consolidates kanji data from the CSV files in this repository:
 
 ## Prerequisites
 
-- **Node.js** v18 or later
-- **npm** v9 or later
+- **Node.js** v18 or later (v20 LTS recommended) — check with `node --version`
+- **npm** v9 or later — check with `npm --version`
 
-## Setup
+> **Node version matters.** The app uses Expo SDK 55 and React Native 0.83 which require Node ≥ 18. If you have an older version, install [Node 20 LTS](https://nodejs.org/en/download) or use [nvm](https://github.com/nvm-sh/nvm): `nvm install 20 && nvm use 20`.
+
+## Setup & Run (Quick Start)
 
 ```bash
-# Clone and enter the app directory
+# 1. Enter the app directory
 cd KanjiDictApp
 
-# Install dependencies
+# 2. Install dependencies
 npm install
 
-# Generate the kanji database from CSV files (run once)
-node scripts/processCSV.js
+# 3. Start the web app
+npm start
 ```
 
-The script processes all CSV files and writes `src/data/kanjiDB.json` (~1.7 MB, 3,138 kanji).
+Then open **http://localhost:8081** in your browser.
 
-## Running on macOS (Web)
+> `npm start` now launches the web version directly. The kanji database (`src/data/kanjiDB.json`) is already included in the repo — no extra generation step needed.
+
+## Running on macOS (Web) — Alternative Commands
 
 ```bash
 cd KanjiDictApp
-npx expo start --web --port 8082
+npm run web             # same as npm start, explicit web flag
+# or
+npx expo start --web --port 8082   # on a custom port
 ```
-
-Then open **http://localhost:8082** in your browser.
-
-> The camera OCR feature uses your Mac's webcam via the browser's `getUserMedia` API — allow camera access when prompted.
 
 ## Running on iOS Simulator
 
@@ -139,3 +141,39 @@ If you modify the CSV files, re-run the processing script:
 cd KanjiDictApp
 node scripts/processCSV.js
 ```
+
+## Troubleshooting
+
+**`npm install` fails with peer dependency errors**
+```bash
+npm install --legacy-peer-deps
+```
+A `.npmrc` file with `legacy-peer-deps=true` is already included, so plain `npm install` should handle this automatically.
+
+**`npm install` or `npm start` crashes immediately**
+Check your Node version:
+```bash
+node --version   # needs v18 or higher
+```
+If below v18, upgrade via [nodejs.org](https://nodejs.org/en/download) or with nvm:
+```bash
+nvm install 20
+nvm use 20
+```
+
+**App opens but shows a blank white screen**
+Hard refresh the browser: `Cmd+Shift+R` (Mac) or `Ctrl+Shift+R` (Windows/Linux). If that doesn't work, check the browser console for errors.
+
+**`expo: command not found`**
+Use `npx` prefix instead:
+```bash
+npx expo start --web
+```
+
+**Stroke order animation doesn't appear**
+The stroke order SVGs are fetched live from GitHub. Make sure you have an internet connection and the browser isn't blocking `raw.githubusercontent.com`.
+
+**Camera doesn't work**
+- Only works in browsers that support `getUserMedia` (Chrome, Firefox, Edge, Safari 14+)
+- You must allow camera permission when the browser prompts
+- On macOS, also check System Settings → Privacy & Security → Camera → allow your browser
