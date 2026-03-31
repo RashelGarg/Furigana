@@ -147,9 +147,8 @@ function buildAnimatedSVG(svgText, strokeColor, accentColor, speed) {
     const paths = svg.querySelectorAll('path');
     const totalStrokes = paths.length;
 
-    // Remove existing style/defs/text to avoid conflicts
+    // Remove existing style/defs to avoid conflicts (but KEEP text elements for perfect positioning)
     svg.querySelectorAll('style').forEach(el => el.remove());
-    svg.querySelectorAll('text').forEach(el => el.remove());
 
     // Style each path for sequential animation
     let styleCSS = '';
@@ -178,28 +177,18 @@ function buildAnimatedSVG(svgText, strokeColor, accentColor, speed) {
         }
       `;
 
-      // Number label at start of stroke
-      if (path.getAttribute('d')) {
-        // Parse first point of path
-        const dAttr = path.getAttribute('d');
-        const match = dAttr.match(/M\s*([\d.]+)[,\s]+([\d.]+)/i);
-        if (match) {
-          const x = parseFloat(match[1]);
-          const y = parseFloat(match[2]);
-          const text = doc.createElementNS('http://www.w3.org/2000/svg', 'text');
-          text.setAttribute('x', x.toString());
-          text.setAttribute('y', (y - 4).toString());
-          text.setAttribute('font-size', '7');
-          text.setAttribute('fill', accentColor);
-          text.setAttribute('font-family', 'sans-serif');
-          text.setAttribute('font-weight', 'bold');
-          text.style.animation = `fadein ${0.3}s ease forwards`;
-          text.style.animationDelay = `${delay.toFixed(2)}s`;
-          text.style.opacity = '0';
-          text.textContent = (i + 1).toString();
-          svg.appendChild(text);
-        }
-      }
+    });
+
+    // Animate the pre-existing perfectly-positioned KanjiVG numbers!
+    const texts = svg.querySelectorAll('text');
+    texts.forEach((text, i) => {
+      const delay = (i / totalStrokes) * parseFloat(totalDuration);
+      text.setAttribute('fill', accentColor);
+      text.setAttribute('font-family', 'sans-serif');
+      text.setAttribute('font-weight', 'bold');
+      text.style.animation = `fadein ${0.3}s ease forwards`;
+      text.style.animationDelay = `${delay.toFixed(2)}s`;
+      text.style.opacity = '0';
     });
 
     // Add fade-in for numbers
