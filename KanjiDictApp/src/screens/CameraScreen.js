@@ -104,17 +104,23 @@ export default function CameraScreen({ navigation }) {
       const { data } = await worker.recognize(tmpCanvas);
       await worker.terminate();
 
-      // ── False-positive filtering ─────────────────────────────────────────
-      // 65%: balanced for Japanese OCR on phone screens and printed text.
-      // The primary guard is the dictionary check below — random noise and
-      // background patterns almost never match our 3,138-kanji vocabulary.
-      const highConfWords = (data.words || []).filter(w => w.confidence > 65);
-      const highConfText  = highConfWords.map(w => w.text).join('');
+      // ── DEBUG: log raw OCR output to browser console ──────────────────────
+      console.log('[OCR] page confidence:', data.confidence);
+      console.log('[OCR] all words:', (data.words || []).map(w => `"${w.text}" (${Math.round(w.confidence)}%)`).join(', '));
+      console.log('[OCR] raw text:', data.text);
 
-      // Must contain at least one kanji that's actually in our dictionary.
-      // This handles single kanji (死, 山, etc.) and compounds alike.
-      const kanji   = extractKanji(highConfText);
-      if (kanji.length === 0) return;
+      // 65%: balanced for Japanese OCR on phone screens and printed text.
+      const highConfWords = (data.words || []).filter(w => w.confidence > 65);
+      console.log('[OCR] high-conf words (>65%):', highConfWords.map(w => `"${w.text}" (${Math.round(w.confidence)}%)`).join(', '));
+
+      const highConfText  = highConfWords.map(w => w.text).join('');
+      const kanji         = extractKanji(highConfText);
+      console.log('[OCR] kanji found:', kanji);
+
+      if (kanji.length === 0) {
+        console.log('[OCR] → blocked: no dictionary kanji in high-conf text');
+        return;
+      }
 
       const entries = kanji.map(k => lookupKanji(k)).filter(Boolean);
       if (entries.length > 0) {
