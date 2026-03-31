@@ -18,6 +18,10 @@ export default function CameraScreen({ navigation }) {
   const [cameraActive, setCameraActive] = useState(false);
   const [inputText, setInputText] = useState('');
   const [frozen, setFrozen] = useState(false);
+  const [isCropping, setIsCropping] = useState(false);
+  const [dragStart, setDragStart] = useState(null);
+  const [cropRect, setCropRect] = useState(null);
+  const [viewSize, setViewSize] = useState({ width: 0, height: 0 });
   const [ocrProgress, setOcrProgress] = useState(null); // 0-100 or null
   const [sourceText, setSourceText] = useState(''); // full text for furigana display
   const [ocrDebugLog, setOcrDebugLog] = useState([]); // on-screen debug info
@@ -100,18 +104,21 @@ export default function CameraScreen({ navigation }) {
         // Discard low confidence lines
         if (line.confidence < 65) return false;
         
-        // Ensure the line has predominantly Japanese characters (kanji/kana)
-        const text = line.text || '';
-        const kanjiKanaCount = (text.match(/[\u4E00-\u9FAF\u3400-\u4DBF\u3040-\u309F\u30A0-\u30FF]/g) || []).length;
-        const totalChars = text.replace(/\s+/g, '').length;
+        // Aggressively aggressively strip all formatting and English numbers/characters out
+        const cleanText = text.replace(/[a-zA-Z0-9\s]/g, '');
+        const kanjiKanaCount = (cleanText.match(/[\u4E00-\u9FAF\u3400-\u4DBF\u3040-\u309F\u30A0-\u30FF]/g) || []).length;
+        const totalChars = cleanText.length;
         if (totalChars === 0) return false;
         
         return (kanjiKanaCount / totalChars) >= 0.5; 
       });
 
-      const allText = (data.lines && data.lines.length > 0)
+      let allText = (data.lines && data.lines.length > 0)
         ? validLines.map(l => l.text).join('\n')
         : (data.text || '');
+
+      // The absolute nuclear option: no Latin/English characters will survive into Furigana lookup.
+      allText = allText.replace(/[a-zA-Z0-9]/g, '');
 
       if (!allText.trim()) {
         log.push('No usable text detected');
@@ -174,15 +181,35 @@ export default function CameraScreen({ navigation }) {
     // Pause live video
     video.pause();
 
-    // ── Create mathematically cropped canvas for Tesseract ──
-    // Viewfinder dimensions: 80% width, 35% height, centered vertically
+    // Reset crop state and enter crop mode
+    setCropRect(null);
+    setDragStart(null);
+    setIsCropping(true);
+  }, []);
+
+  const analyzeCrop = useCallback(async () => {
+    const video = videoRef.current;
+    if (!video || !cropRect || viewSize.width === 0) return;
+    
+    setIsCropping(false); // End crop mode UI
+    
     const cropCanvas = document.createElement('canvas');
-    const vw = video.videoWidth;
-    const vh = video.videoHeight;
-    const cropW = vw * 0.8;
-    const cropH = vh * 0.35;
-    const cropX = vw * 0.1;
-    const cropY = vh * 0.325;
+    // Map the view bounds precisely back to the native video pixel dimensions
+    const scaleX = video.videoWidth / viewSize.width;
+    const scaleY = video.videoHeight / viewSize.height;
+    
+    const cropW = cropRect.width * scaleX;
+    const cropH = cropRect.height * scaleY;
+    const cropX = cropRect.x * scaleX;
+    const cropY = cropRect.y * scaleY;
+    
+    // Prevent 0-area crops crashing Tesseract
+    if (cropW === 0 || cropH === 0) {
+      frozenRef.current = false;
+      setFrozen(false);
+      if (video) video.play();
+      return;
+    }
     
     cropCanvas.width = cropW;
     cropCanvas.height = cropH;
@@ -194,7 +221,7 @@ export default function CameraScreen({ navigation }) {
 
     // OCR only the targeted region!
     await runOCR(cropCanvas);
-  }, [runOCR]);
+  }, [cropRect, viewSize, runOCR]);
 
   // "Resume": unfreeze, restart live stream and interval
   const resumeCamera = useCallback(() => {
@@ -250,7 +277,10 @@ export default function CameraScreen({ navigation }) {
       {mode === 'camera' && Platform.OS === 'web' && (
         <View style={styles.cameraSection}>
           {/* Video / frozen canvas preview */}
-          <View style={[styles.videoWrapper, { backgroundColor: '#000', borderColor: theme.border }]}>
+          <View 
+            style={[styles.videoWrapper, { backgroundColor: '#000', borderColor: theme.border }]}
+            onLayout={(e) => setViewSize(e.nativeEvent.layout)}
+          >
             {/* Live video — hidden when frozen */}
             <video
               ref={videoRef}
@@ -287,17 +317,47 @@ export default function CameraScreen({ navigation }) {
               </View>
             )}
 
-            {/* Viewfinder Target Overlay */}
-            {cameraActive && (
-              <View style={StyleSheet.absoluteFill} pointerEvents="none">
-                <View style={styles.vfTop} />
-                <View style={styles.vfMiddleRow}>
-                  <View style={styles.vfSide} />
-                  <View style={[styles.vfCenter, { borderColor: theme.primary }]} />
-                  <View style={styles.vfSide} />
-                </View>
-                <View style={styles.vfBottom}>
-                  <Text style={styles.vfHelpText}>Align text inside box</Text>
+            {/* Interactive Cropping Overlay */}
+            {frozen && isCropping && (
+              <View 
+                style={StyleSheet.absoluteFill}
+                onStartShouldSetResponder={() => true}
+                onMoveShouldSetResponder={() => true}
+                onResponderGrant={(e) => {
+                  const { locationX, locationY } = e.nativeEvent;
+                  setDragStart({ x: locationX, y: locationY });
+                  setCropRect({ x: locationX, y: locationY, width: 0, height: 0 });
+                }}
+                onResponderMove={(e) => {
+                  const { locationX, locationY } = e.nativeEvent;
+                  if (dragStart) {
+                    const x = Math.min(dragStart.x, locationX);
+                    const y = Math.min(dragStart.y, locationY);
+                    const width = Math.abs(locationX - dragStart.x);
+                    const height = Math.abs(locationY - dragStart.y);
+                    setCropRect({ x, y, width, height });
+                  }
+                }}
+              >
+                {/* Dim background helper */}
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} pointerEvents="none" />
+                
+                {/* Drawn highlight rectangle */}
+                {cropRect && (
+                  <View style={{
+                    position: 'absolute',
+                    left: cropRect.x,
+                    top: cropRect.y,
+                    width: cropRect.width,
+                    height: cropRect.height,
+                    borderWidth: 2,
+                    borderColor: theme.primary,
+                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                  }} pointerEvents="none" />
+                )}
+                
+                <View style={styles.cropHintBadge}>
+                  <Text style={styles.cropHintText}>Draw a box around the Japanese text</Text>
                 </View>
               </View>
             )}
@@ -328,13 +388,31 @@ export default function CameraScreen({ navigation }) {
                 <Text style={styles.bigBtnText}>Start Camera</Text>
               </TouchableOpacity>
             ) : frozen ? (
-              /* Frozen state: show Resume button */
-              <TouchableOpacity
-                style={[styles.bigBtn, { backgroundColor: theme.accent }]}
-                onPress={resumeCamera}
-              >
-                <Text style={styles.bigBtnText}>▶ Resume Camera</Text>
-              </TouchableOpacity>
+              isCropping ? (
+                <View style={styles.cameraActiveControls}>
+                  <TouchableOpacity
+                    style={[styles.controlBtn, { backgroundColor: theme.primary, opacity: (cropRect && cropRect.width > 10) ? 1 : 0.4 }]}
+                    onPress={analyzeCrop}
+                    disabled={!cropRect || cropRect.width <= 10}
+                  >
+                    <Text style={styles.controlBtnText}>✅ Analyze Selection</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.controlBtn, { backgroundColor: theme.surfaceAlt, borderColor: theme.border, borderWidth: 1 }]}
+                    onPress={resumeCamera}
+                  >
+                    <Text style={[styles.controlBtnText, { color: theme.text }]}>❌ Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                /* Frozen state: show Resume button */
+                <TouchableOpacity
+                  style={[styles.bigBtn, { backgroundColor: theme.accent }]}
+                  onPress={resumeCamera}
+                >
+                  <Text style={styles.bigBtnText}>▶ Resume Camera</Text>
+                </TouchableOpacity>
+              )
             ) : (
               <View style={styles.cameraActiveControls}>
                 <TouchableOpacity
@@ -524,23 +602,20 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     overflow: 'hidden',
-    minHeight: 200,
+    aspectRatio: 16 / 9,
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    backgroundColor: '#000',
   },
   cameraPlaceholder: { alignItems: 'center', padding: 40 },
   cameraIcon: { fontSize: 48, marginBottom: 12 },
   cameraHint: { fontSize: 15, fontWeight: '600', marginBottom: 4 },
   cameraHintSub: { fontSize: 13, textAlign: 'center' },
   
-  // Viewfinder overlay styles
-  vfTop: { height: '32.5%', width: '100%', backgroundColor: 'rgba(0,0,0,0.55)' },
-  vfMiddleRow: { flexDirection: 'row', height: '35%', width: '100%' },
-  vfSide: { width: '10%', height: '100%', backgroundColor: 'rgba(0,0,0,0.55)' },
-  vfCenter: { width: '80%', height: '100%', borderWidth: 2.5, backgroundColor: 'transparent' },
-  vfBottom: { height: '32.5%', width: '100%', backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', paddingTop: 16 },
-  vfHelpText: { color: 'white', backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, overflow: 'hidden', fontSize: 13, fontWeight: '700' },
+  cropHintBadge: { position: 'absolute', top: 16, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
+  cropHintText: { color: '#FFF', fontSize: 14, fontWeight: '700' },
   
   frozenBadge: {
     position: 'absolute',
