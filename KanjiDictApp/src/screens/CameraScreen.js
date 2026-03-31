@@ -259,7 +259,7 @@ export default function CameraScreen({ navigation }) {
           style={[styles.modeTab, mode === 'camera' && { backgroundColor: theme.primary }]}
           onPress={() => { setMode('camera'); setDetectedKanji([]); setSourceText(''); }}
         >
-          <Text style={[styles.modeTabText, { color: mode === 'camera' ? '#FFF' : theme.textSecondary }]}>
+          <Text style={[styles.modeTabText, { color: mode === 'camera' ? theme.buttonText : theme.textSecondary }]}>
             📷 Camera OCR
           </Text>
         </TouchableOpacity>
@@ -267,7 +267,7 @@ export default function CameraScreen({ navigation }) {
           style={[styles.modeTab, mode === 'text' && { backgroundColor: theme.primary }]}
           onPress={() => { setMode('text'); stopCamera(); setDetectedKanji([]); setSourceText(''); }}
         >
-          <Text style={[styles.modeTabText, { color: mode === 'text' ? '#FFF' : theme.textSecondary }]}>
+          <Text style={[styles.modeTabText, { color: mode === 'text' ? theme.buttonText : theme.textSecondary }]}>
             ✍️ Text Input
           </Text>
         </TouchableOpacity>
@@ -370,7 +370,7 @@ export default function CameraScreen({ navigation }) {
             {/* Scanning overlay with progress */}
             {scanning && (
               <View style={styles.scanningOverlay}>
-                <ActivityIndicator size="small" color="#FFF" />
+                <ActivityIndicator size="small" color={theme.buttonText} />
                 <Text style={styles.scanningText}>
                   {ocrProgress !== null ? `${ocrProgress}%` : 'Loading OCR…'}
                 </Text>
@@ -661,7 +661,7 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 4,
   },
-  bigBtnText: { color: '#FFF', fontSize: 16, fontWeight: '700', letterSpacing: 0.5 },
+  bigBtnText: { color: '#4A3525', fontSize: 16, fontWeight: '700', letterSpacing: 0.5 },
   cameraActiveControls: { flexDirection: 'row', gap: 12 },
   controlBtn: {
     flex: 1,
@@ -674,7 +674,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
-  controlBtnText: { color: '#FFF', fontSize: 15, fontWeight: '600' },
+  controlBtnText: { color: '#4A3525', fontSize: 15, fontWeight: '600' },
   textSection: { paddingHorizontal: 12, paddingTop: 8 },
   inputLabel: { fontSize: 14, marginBottom: 8 },
   demoScroll: { marginBottom: 10 },
@@ -692,7 +692,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 10,
   },
-  analyzeBtnText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+  analyzeBtnText: { color: '#4A3525', fontSize: 16, fontWeight: '700' },
   resultsSection: { flex: 1, paddingHorizontal: 12, paddingTop: 8 },
   furiganaCard: {
     borderRadius: 12,
@@ -735,7 +735,7 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
     borderRadius: 3,
   },
-  tileJLPTText: { color: '#FFF', fontSize: 8, fontWeight: '700' },
+  tileJLPTText: { color: '#4A3525', fontSize: 8, fontWeight: '700' },
   hintSection: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 30 },
   hintTitle: { fontSize: 56, marginBottom: 16 },
   hintText: { fontSize: 15, textAlign: 'center', lineHeight: 22, marginBottom: 8 },
@@ -758,3 +758,4 @@ const styles = StyleSheet.create({
   debugTitle: { color: '#FFF', fontSize: 13, fontWeight: '700', marginBottom: 8 },
   debugLine: { color: '#FFF', fontSize: 11, fontFamily: 'monospace', lineHeight: 17 },
 });
+

@@ -87,7 +87,7 @@ export default function StrokeOrderView({ entry }) {
             >
               <Text style={[
                 styles.speedText,
-                { color: speed === s ? '#FFFFFF' : theme.textSecondary }
+                { color: speed === s ? theme.buttonText : theme.textSecondary }
               ]}>{s}x</Text>
             </TouchableOpacity>
           ))}
@@ -271,8 +271,9 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   replayText: {
-    color: '#FFFFFF',
+    color: '#4A3525',
     fontSize: 12,
     fontWeight: '600',
   },
 });
+

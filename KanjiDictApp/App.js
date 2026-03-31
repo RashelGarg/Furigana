@@ -117,7 +117,7 @@ export default function App() {
         * {
           font-family: 'Inter', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
         }
-        body { background-color: #F5F5F7; }
+        body { background-color: #FFEECC; color: #4A3525; }
       `));
       document.head.appendChild(style);
     }

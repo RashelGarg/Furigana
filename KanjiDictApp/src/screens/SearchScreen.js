@@ -282,7 +282,7 @@ export default function SearchScreen({ navigation }) {
           >
             <Text style={[
               styles.modeTabText,
-              { color: searchMode === mode ? '#FFF' : theme.textSecondary },
+              { color: searchMode === mode ? theme.buttonText : theme.textSecondary },
             ]}>
               {mode === 'Words' ? '📝 Words' : '漢 Kanji'}
             </Text>
@@ -335,7 +335,7 @@ export default function SearchScreen({ navigation }) {
             ]}
             onPress={() => { setActiveFilter(null); setKanjiResults([]); setQuery(''); setShowRecent(true); }}
           >
-            <Text style={[styles.filterTabText, { color: !activeFilter ? '#FFF' : theme.textSecondary }]}>All</Text>
+            <Text style={[styles.filterTabText, { color: !activeFilter ? theme.buttonText : theme.textSecondary }]}>All</Text>
           </TouchableOpacity>
           {JLPT_LEVELS.map(level => (
             <TouchableOpacity
@@ -351,7 +351,7 @@ export default function SearchScreen({ navigation }) {
             >
               <Text style={[
                 styles.filterTabText,
-                { color: activeFilter === level ? '#FFF' : theme.textSecondary },
+                { color: activeFilter === level ? theme.buttonText : theme.textSecondary },
               ]}>{level}</Text>
             </TouchableOpacity>
           ))}
@@ -494,3 +494,5 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 16, fontWeight: '600', marginBottom: 8 },
   emptyHint: { fontSize: 13, textAlign: 'center', paddingHorizontal: 40 },
 });
+
+

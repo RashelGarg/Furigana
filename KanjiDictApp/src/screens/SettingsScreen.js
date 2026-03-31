@@ -43,7 +43,7 @@ export default function SettingsScreen() {
               value={isDark}
               onValueChange={setIsDark}
               trackColor={{ false: theme.border, true: theme.primary }}
-              thumbColor="#FFFFFF"
+              thumbColor={theme.buttonText}
             />
           }
         />
@@ -63,7 +63,7 @@ export default function SettingsScreen() {
               >
                 <Text style={[
                   styles.fontBtnText,
-                  { color: fontSize === size ? '#FFF' : theme.textSecondary }
+                  { color: fontSize === size ? theme.buttonText : theme.textSecondary }
                 ]}>
                   {size === 'small' ? 'A' : size === 'medium' ? 'Aa' : 'AA'}
                 </Text>
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
     minWidth: 32,
     alignItems: 'center',
   },
-  jlptBadgeText: { color: '#FFF', fontSize: 11, fontWeight: '700' },
+  jlptBadgeText: { color: '#4A3525', fontSize: 11, fontWeight: '700' },
   jlptDesc: { fontSize: 12, width: 110 },
   jlptBar: {
     flex: 1,
@@ -246,3 +246,5 @@ const styles = StyleSheet.create({
   jlptBarFill: { height: '100%', borderRadius: 3 },
   jlptCount: { fontSize: 12, fontWeight: '600', minWidth: 32, textAlign: 'right' },
 });
+
+
