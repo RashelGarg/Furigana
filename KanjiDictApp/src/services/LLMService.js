@@ -1,16 +1,28 @@
 /**
- * LLMService — Qwen2.5-0.5B-Instruct via @xenova/transformers
+ * LLMService — Qwen2.5-0.5B-Instruct via @xenova/transformers (CDN)
  *
- * Runs entirely in-browser (WebAssembly backend).
- * On mobile browsers the model is downloaded once (~380 MB INT8 quantised)
- * and cached in IndexedDB — subsequent loads are instant.
+ * Expo's Metro bundler does not support `import.meta` (used internally by
+ * @xenova/transformers).  The fix: load the library from jsDelivr CDN at
+ * runtime using `new Function('u','return import(u)')`.  This bypasses
+ * Metro's static-analysis pass so the browser handles the real ES-module
+ * import natively — `import.meta.url` is then the CDN URL, which lets
+ * transformers.js resolve its WASM files correctly.
  *
- * Primary capability used here: context-aware furigana generation.
- * Qwen2.5 understands compound readings (e.g. 今日→きょう, not にち+ひ)
- * which dictionary lookup cannot handle.
+ * Model: onnx-community/Qwen2.5-0.5B-Instruct (INT4 q4, ~280 MB)
+ * Cached in browser IndexedDB after first download — subsequent loads instant.
  */
 
 import { Platform } from 'react-native';
+
+// @huggingface/transformers v3 — supports Qwen2.5 natively via onnx-community models
+const CDN = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.3';
+
+/**
+ * Dynamic import that bypasses Metro's static analysis.
+ * Metro resolves `import(string_literal)` at build time; wrapping in
+ * `new Function` defers resolution to the browser at runtime.
+ */
+const _runtimeImport = new Function('u', 'return import(u)');
 
 // Status values exported for UI display
 export const LLM_STATUS = {
@@ -56,17 +68,18 @@ export async function loadLLM(onProgress) {
 
   notify(LLM_STATUS.LOADING, 0);
   try {
-    const { pipeline, env } = await import('@xenova/transformers');
+    // Load from CDN — avoids Metro's import.meta incompatibility
+    const { pipeline, env } = await _runtimeImport(`${CDN}/dist/transformers.min.js`);
 
-    // Always fetch from HuggingFace Hub (caches in IndexedDB after first download)
-    env.allowLocalModels  = false;
-    env.useBrowserCache   = true;
+    // Fetch models from HuggingFace Hub; cache in browser IndexedDB after first download
+    env.allowLocalModels = false;
+    env.useBrowserCache  = true;
 
     _pipe = await pipeline(
       'text-generation',
-      'Xenova/Qwen2.5-0.5B-Instruct',
+      'onnx-community/Qwen2.5-0.5B-Instruct',   // public ONNX conversion of Qwen2.5-0.5B
       {
-        quantized: true,           // INT8 — ~380 MB, runs on mid-range phones
+        dtype: 'q4',               // INT4 quantised — ~280 MB, runs on mid-range phones
         progress_callback: (p) => {
           if (p.status === 'progress') {
             const pct = Math.round((p.loaded / p.total) * 100) || 0;
