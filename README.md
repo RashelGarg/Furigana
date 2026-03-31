@@ -2,17 +2,26 @@
 
 A React Native camera-based kanji dictionary app inspired by Shirabe Jisho. Built with Expo, it processes 3,138 kanji from CSV data files and provides live OCR, animated stroke order, and comprehensive dictionary entries.
 
+## Table of Contents
+- [Features](#features)
+- [Data Sources](#data-sources)
+- [Prerequisites](#prerequisites)
+- [Setup & Run](#setup--run-quick-start)
+- [Project Structure](#project-structure)
+- [Tech Stack](#tech-stack)
+- [Stroke Order](#stroke-order)
+- [Troubleshooting](#troubleshooting)
+
 ## Features
 
-- **Camera OCR** — point your webcam at Japanese text to detect and look up kanji in real time
-- **Text Input** — paste any Japanese sentence to extract and analyze all kanji
-- **Animated Stroke Order** — live SVG animations fetched from KanjiVG showing correct stroke sequence with speed control
-- **Full Dictionary Entries** — on'yomi, kun'yomi, meanings, JLPT level, frequency rank, jouyou/jinmeiyou status
-- **Search** — by English meaning, katakana reading, hiragana reading, or direct kanji character
-- **JLPT Filter** — browse kanji by N5, N4, N3, N2, or N1 level
-- **Bookmarks** — save kanji with persistent local storage
-- **Dark Mode** — full theme switch across all screens
-- **3,138 Kanji** — sourced from JLPT CSVs, Jouyou, Jinmeiyou, and frequency-ranked CSVs
+- **Advanced Camera OCR** — point your webcam at Japanese text, freeze the frame, and capture to detect kanji in real time using Tesseract.js with custom Japanese density filtering.
+- **Context-Aware Furigana** — utilizes Kuromoji morphological analysis to intelligently attach okurigana and accurately read compound kanji based on context. 
+- **Text Input** — paste any Japanese sentence to extract and analyze all kanji.
+- **Animated Stroke Order** — live SVG animations fetched from KanjiVG showing correct stroke sequence with speed control.
+- **Full Dictionary Entries** — on'yomi, kun'yomi, meanings, JLPT level, frequency rank, jouyou/jinmeiyou status.
+- **Search & Filters** — search by English, katakana, hiragana, or direct kanji. Filter by JLPT levels (N5-N1).
+- **Bookmarks** — save kanji with persistent local storage.
+- **Dark Mode** — full UI theme switch across all screens.
 
 ## Data Sources
 
@@ -33,7 +42,7 @@ The app consolidates kanji data from the CSV files in this repository:
 - **Node.js** v18 or later (v20 LTS recommended) — check with `node --version`
 - **npm** v9 or later — check with `npm --version`
 
-> **Node version matters.** The app uses Expo SDK 55 and React Native 0.83 which require Node ≥ 18. If you have an older version, install [Node 20 LTS](https://nodejs.org/en/download) or use [nvm](https://github.com/nvm-sh/nvm): `nvm install 20 && nvm use 20`.
+> **Note:** The app uses Expo SDK 55 and React Native 0.83 which require Node ≥ 18.
 
 ## Setup & Run (Quick Start)
 
@@ -50,61 +59,32 @@ npm start
 
 Then open **http://localhost:8081** in your browser.
 
-> `npm start` now launches the web version directly. The kanji database (`src/data/kanjiDB.json`) is already included in the repo — no extra generation step needed.
-
-## Running on macOS (Web) — Alternative Commands
-
-```bash
-cd KanjiDictApp
-npm run web             # same as npm start, explicit web flag
-# or
-npx expo start --web --port 8082   # on a custom port
-```
-
-## Running on iOS Simulator
-
-```bash
-cd KanjiDictApp
-npx expo start --ios
-```
-
-Requires Xcode and iOS Simulator installed.
-
-## Running on Android Emulator
-
-```bash
-cd KanjiDictApp
-npx expo start --android
-```
-
-Requires Android Studio and an AVD configured.
-
 ## Project Structure
 
 ```
 Furigana/                        ← repository root (CSV data files)
 ├── *.csv                        ← kanji data files
 └── KanjiDictApp/                ← React Native app
-    ├── scripts/
-    │   └── processCSV.js        ← data processing script
     ├── src/
     │   ├── data/
-    │   │   └── kanjiDB.json     ← generated database (run processCSV.js)
+    │   │   └── kanjiDB.json     ← generated database
     │   ├── screens/
-    │   │   ├── CameraScreen.js  ← OCR + text input
+    │   │   ├── CameraScreen.js  ← Advanced OCR & Thresholding logic
     │   │   ├── SearchScreen.js  ← search + JLPT filters
-    │   │   ├── KanjiDetailScreen.js  ← detail view + stroke order
+    │   │   ├── KanjiDetailScreen.js
     │   │   ├── BookmarksScreen.js
     │   │   └── SettingsScreen.js
     │   ├── components/
-    │   │   ├── StrokeOrderView.js   ← animated KanjiVG SVG
-    │   │   ├── KanjiCard.js
-    │   │   └── JLPTBadge.js
+    │   │   ├── FuriganaText.js  ← Kuromoji morphological rendering
+    │   │   ├── StrokeOrderView.js
+    │   │   └── KanjiCard.js
+    │   ├── services/
+    │   │   └── KuromojiService.js ← NLP tokenizer
     │   ├── utils/
-    │   │   ├── kanjiUtils.js    ← search, lookup, data helpers
+    │   │   ├── kanjiUtils.js
     │   │   └── storage.js       ← AsyncStorage (bookmarks, history)
     │   └── theme/
-    │       ├── colors.js        ← light + dark theme tokens
+    │       ├── colors.js
     │       └── ThemeContext.js  ← theme provider
     ├── App.js                   ← navigation root
     ├── app.json
@@ -118,62 +98,16 @@ Furigana/                        ← repository root (CSV data files)
 | Framework | Expo SDK 55 / React Native |
 | Navigation | React Navigation v7 (bottom tabs + stack) |
 | Web rendering | react-native-web |
-| OCR | Tesseract.js (web, lazy-loaded) |
+| OCR Engine | Tesseract.js (web, lazy-loaded) + Custom Heuristics |
+| NLP & Tokenization | Kuromoji.js |
 | Stroke order | KanjiVG (fetched live from GitHub) |
 | Storage | @react-native-async-storage/async-storage |
-| Gestures | react-native-gesture-handler |
 
 ## Stroke Order
 
-Stroke order animations are fetched on demand from the [KanjiVG](https://kanjivg.tagaini.net/) project:
-
-```
-https://raw.githubusercontent.com/KanjiVG/kanjivg/master/kanji/{unicode}.svg
-```
-
-KanjiVG is by Ulrich Apel, licensed under [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/).
-
-## Regenerating the Database
-
-If you modify the CSV files, re-run the processing script:
-
-```bash
-cd KanjiDictApp
-node scripts/processCSV.js
-```
+Stroke order animations are fetched on demand from the [KanjiVG](https://kanjivg.tagaini.net/) project. KanjiVG is by Ulrich Apel, licensed under [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/).
 
 ## Troubleshooting
 
-**`npm install` fails with peer dependency errors**
-```bash
-npm install --legacy-peer-deps
-```
-A `.npmrc` file with `legacy-peer-deps=true` is already included, so plain `npm install` should handle this automatically.
-
-**`npm install` or `npm start` crashes immediately**
-Check your Node version:
-```bash
-node --version   # needs v18 or higher
-```
-If below v18, upgrade via [nodejs.org](https://nodejs.org/en/download) or with nvm:
-```bash
-nvm install 20
-nvm use 20
-```
-
-**App opens but shows a blank white screen**
-Hard refresh the browser: `Cmd+Shift+R` (Mac) or `Ctrl+Shift+R` (Windows/Linux). If that doesn't work, check the browser console for errors.
-
-**`expo: command not found`**
-Use `npx` prefix instead:
-```bash
-npx expo start --web
-```
-
-**Stroke order animation doesn't appear**
-The stroke order SVGs are fetched live from GitHub. Make sure you have an internet connection and the browser isn't blocking `raw.githubusercontent.com`.
-
-**Camera doesn't work**
-- Only works in browsers that support `getUserMedia` (Chrome, Firefox, Edge, Safari 14+)
-- You must allow camera permission when the browser prompts
-- On macOS, also check System Settings → Privacy & Security → Camera → allow your browser
+- **`npm install` fails with peer dependency errors:** A `.npmrc` file with `legacy-peer-deps=true` is included, but you can force it manually via `npm install --legacy-peer-deps`.
+- **Camera doesn't work:** Only works in browsers that support `getUserMedia`. You must grant camera permissions!
