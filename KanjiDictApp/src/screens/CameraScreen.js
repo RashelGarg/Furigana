@@ -96,7 +96,6 @@ export default function CameraScreen({ navigation }) {
       const d = imgData.data;
       for (let i = 0; i < d.length; i += 4) {
         const grey = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-        // Simple contrast stretch: push dark pixels darker, light pixels lighter
         const contrast = Math.min(255, Math.max(0, (grey - 128) * 1.4 + 128));
         d[i] = d[i + 1] = d[i + 2] = contrast;
       }
@@ -105,20 +104,28 @@ export default function CameraScreen({ navigation }) {
       const { data } = await worker.recognize(tmpCanvas);
       await worker.terminate();
 
-      // Filter words by confidence > 60 and extract kanji characters
-      const highConfText = (data.words || [])
-        .filter(w => w.confidence > 60)
-        .map(w => w.text)
-        .join('');
+      // ── Strict false-positive filtering ─────────────────────────────────
+      // 1. Only keep words with confidence > 80 (was 60 — too many ghost reads)
+      const highConfWords = (data.words || []).filter(w => w.confidence > 80);
 
-      const bestText = highConfText.length > 0 ? highConfText : data.text;
-      const kanji = extractKanji(bestText);
-      if (kanji.length > 0) {
-        const entries = kanji.map(k => lookupKanji(k)).filter(Boolean);
-        if (entries.length > 0) {
-          setDetectedKanji(entries);
-          setSourceText(bestText.trim());
-        }
+      // 2. Require at least 2 high-confidence words — single isolated
+      //    characters from noise are almost never real text
+      if (highConfWords.length < 2) return;
+
+      // 3. Require that the overall page confidence is > 70
+      //    (data.confidence is the mean confidence across all words)
+      if ((data.confidence || 0) < 70) return;
+
+      const highConfText = highConfWords.map(w => w.text).join('');
+
+      // 4. Must contain at least one kanji that's in our dictionary
+      const kanji = extractKanji(highConfText);
+      if (kanji.length === 0) return;
+
+      const entries = kanji.map(k => lookupKanji(k)).filter(Boolean);
+      if (entries.length > 0) {
+        setDetectedKanji(entries);
+        setSourceText(highConfText.trim());
       }
     } catch (e) {
       console.error('OCR error:', e);
