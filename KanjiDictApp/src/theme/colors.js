@@ -1,63 +1,116 @@
-export const lightTheme = {
-  background: '#F8F6F2',
-  surface: '#FFFFFF',
-  surfaceAlt: '#F0EDE8',
-  primary: '#C94B4B',       // deep red — Japanese aesthetic
-  primaryLight: '#E8858585',
-  accent: '#4A7C8C',        // teal
-  accentLight: '#D6E8ED',
-  text: '#1A1A1A',
-  textSecondary: '#666666',
-  textTertiary: '#999999',
-  border: '#E8E4DE',
-  borderLight: '#F0EDE8',
-  success: '#4CAF50',
-  warning: '#FF9800',
-  jlptColors: {
-    N5: '#4CAF50',
-    N4: '#2196F3',
-    N3: '#9C27B0',
-    N2: '#FF9800',
-    N1: '#F44336',
-  },
-  tabBar: '#FFFFFF',
-  tabBarBorder: '#E8E4DE',
-  card: '#FFFFFF',
-  shadow: 'rgba(0,0,0,0.08)',
-  overlay: 'rgba(0,0,0,0.5)',
-  furigana: '#C94B4B',
-  strokeColor: '#1A1A1A',
-  highlightKanji: '#FFE8E8',
-};
+// Version 3 — Modern dark-first design system
+// Primary: Electric Violet | Accent: Neon Cyan | Secondary: Hot Pink
 
 export const darkTheme = {
-  background: '#0F0F0F',
-  surface: '#1A1A1A',
-  surfaceAlt: '#252525',
-  primary: '#E87878',
-  primaryLight: '#3A2020',
-  accent: '#6BA8B8',
-  accentLight: '#1A2D32',
-  text: '#F0F0F0',
-  textSecondary: '#AAAAAA',
-  textTertiary: '#666666',
-  border: '#2A2A2A',
-  borderLight: '#222222',
-  success: '#66BB6A',
-  warning: '#FFA726',
+  // Backgrounds
+  background:     '#06060F',
+  surface:        '#0D0D1E',
+  surfaceAlt:     '#13132A',
+  card:           'rgba(255,255,255,0.04)',
+  cardHighlight:  'rgba(124,58,237,0.12)',
+
+  // Brand
+  primary:        '#7C3AED',
+  primaryLight:   'rgba(124,58,237,0.18)',
+  primaryGlow:    'rgba(124,58,237,0.35)',
+
+  accent:         '#22D3EE',
+  accentLight:    'rgba(34,211,238,0.15)',
+
+  secondary:      '#EC4899',
+  secondaryLight: 'rgba(236,72,153,0.15)',
+
+  success:        '#10B981',
+  warning:        '#F59E0B',
+  error:          '#EF4444',
+
+  // Text
+  text:           '#F1F5F9',
+  textSecondary:  '#94A3B8',
+  textTertiary:   '#475569',
+
+  // Borders
+  border:         'rgba(255,255,255,0.08)',
+  borderLight:    'rgba(255,255,255,0.04)',
+  borderGlow:     'rgba(124,58,237,0.5)',
+
+  // Furigana
+  furigana:       '#22D3EE',
+
+  // Navigation
+  tabBar:         '#0D0D1E',
+  tabBarBorder:   'rgba(255,255,255,0.06)',
+
+  // JLPT
   jlptColors: {
-    N5: '#66BB6A',
-    N4: '#42A5F5',
-    N3: '#AB47BC',
-    N2: '#FFA726',
-    N1: '#EF5350',
+    N5: '#10B981',
+    N4: '#3B82F6',
+    N3: '#8B5CF6',
+    N2: '#F59E0B',
+    N1: '#EF4444',
   },
-  tabBar: '#1A1A1A',
-  tabBarBorder: '#2A2A2A',
-  card: '#1A1A1A',
-  shadow: 'rgba(0,0,0,0.3)',
-  overlay: 'rgba(0,0,0,0.7)',
-  furigana: '#E87878',
-  strokeColor: '#F0F0F0',
-  highlightKanji: '#3A1A1A',
+
+  // Gradients (arrays for LinearGradient)
+  gradientPrimary:  ['#7C3AED', '#EC4899'],
+  gradientAccent:   ['#22D3EE', '#7C3AED'],
+  gradientHero:     ['#1A0A3C', '#06060F'],
+  gradientCard:     ['rgba(124,58,237,0.14)', 'rgba(34,211,238,0.05)'],
+  gradientSurface:  ['#111128', '#06060F'],
+
+  shadow:   'rgba(0,0,0,0.6)',
+  overlay:  'rgba(0,0,0,0.75)',
+  isDark:   true,
+};
+
+export const lightTheme = {
+  background:     '#F8FAFC',
+  surface:        '#FFFFFF',
+  surfaceAlt:     '#F1F5F9',
+  card:           'rgba(0,0,0,0.02)',
+  cardHighlight:  'rgba(109,40,217,0.06)',
+
+  primary:        '#6D28D9',
+  primaryLight:   'rgba(109,40,217,0.1)',
+  primaryGlow:    'rgba(109,40,217,0.2)',
+
+  accent:         '#0891B2',
+  accentLight:    'rgba(8,145,178,0.1)',
+
+  secondary:      '#DB2777',
+  secondaryLight: 'rgba(219,39,119,0.1)',
+
+  success:        '#059669',
+  warning:        '#D97706',
+  error:          '#DC2626',
+
+  text:           '#0F172A',
+  textSecondary:  '#64748B',
+  textTertiary:   '#94A3B8',
+
+  border:         'rgba(0,0,0,0.08)',
+  borderLight:    'rgba(0,0,0,0.04)',
+  borderGlow:     'rgba(109,40,217,0.35)',
+
+  furigana:       '#0891B2',
+
+  tabBar:         '#FFFFFF',
+  tabBarBorder:   'rgba(0,0,0,0.08)',
+
+  jlptColors: {
+    N5: '#059669',
+    N4: '#2563EB',
+    N3: '#7C3AED',
+    N2: '#D97706',
+    N1: '#DC2626',
+  },
+
+  gradientPrimary:  ['#6D28D9', '#DB2777'],
+  gradientAccent:   ['#0891B2', '#6D28D9'],
+  gradientHero:     ['#EDE9FE', '#F8FAFC'],
+  gradientCard:     ['rgba(109,40,217,0.06)', 'rgba(8,145,178,0.02)'],
+  gradientSurface:  ['#FFFFFF', '#F8FAFC'],
+
+  shadow:   'rgba(0,0,0,0.08)',
+  overlay:  'rgba(0,0,0,0.5)',
+  isDark:   false,
 };
