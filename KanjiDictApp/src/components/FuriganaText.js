@@ -103,7 +103,20 @@ function buildHtmlKuromoji(text, fontSize, rtColor) {
       return esc(surface);
     }
 
-    // ── 1. JMdict word lookup (highest priority) ──────────────────────────
+    // ── 1. Kuromoji reading (highest priority for contextual accuracy) ────
+    const rawReading = tok.reading;
+    if (rawReading && rawReading !== surface) {
+      const hiragana = katakanaToHiragana(rawReading);
+      const trailingKana = getTrailingKana(surface);
+      if (trailingKana && hiragana.endsWith(trailingKana) && hiragana.length > trailingKana.length) {
+        const kanjiPart   = surface.slice(0, surface.length - trailingKana.length);
+        const readingPart = hiragana.slice(0, hiragana.length - trailingKana.length);
+        return rubyTag(kanjiPart, readingPart, fontSize, rtColor) + esc(trailingKana);
+      }
+      return rubyTag(surface, hiragana, fontSize, rtColor);
+    }
+
+    // ── 2. JMdict word lookup (fallback and dictionary matches) ───────────
     const jmdictReading = lookupWordReading(surface);
     if (jmdictReading) {
       const trailingKana = getTrailingKana(surface);
@@ -115,19 +128,6 @@ function buildHtmlKuromoji(text, fontSize, rtColor) {
       }
       // Whole compound in ruby: 行列, 東京, 天気, ...
       return rubyTag(surface, jmdictReading, fontSize, rtColor);
-    }
-
-    // ── 2. Kuromoji reading ───────────────────────────────────────────────
-    const rawReading = tok.reading;
-    if (rawReading && rawReading !== surface) {
-      const hiragana = katakanaToHiragana(rawReading);
-      const trailingKana = getTrailingKana(surface);
-      if (trailingKana && hiragana.endsWith(trailingKana) && hiragana.length > trailingKana.length) {
-        const kanjiPart   = surface.slice(0, surface.length - trailingKana.length);
-        const readingPart = hiragana.slice(0, hiragana.length - trailingKana.length);
-        return rubyTag(kanjiPart, readingPart, fontSize, rtColor) + esc(trailingKana);
-      }
-      return rubyTag(surface, hiragana, fontSize, rtColor);
     }
 
     // ── 3. Character-by-character fallback ────────────────────────────────

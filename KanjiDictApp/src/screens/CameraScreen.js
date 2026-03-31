@@ -94,16 +94,32 @@ export default function CameraScreen({ navigation }) {
 
       // ── On-screen debug info ──────────────────────────────────────────────
       log.push(`Page confidence: ${Math.round(data.confidence || 0)}%`);
-      const allWords = data.words || [];
-      if (allWords.length === 0) {
-        log.push('No words detected at all');
+      
+      // ── Filter and extract clean text ──────────────────────────────────────
+      const validLines = (data.lines || []).filter(line => {
+        // Discard low confidence lines
+        if (line.confidence < 65) return false;
+        
+        // Ensure the line has predominantly Japanese characters (kanji/kana)
+        const text = line.text || '';
+        const kanjiKanaCount = (text.match(/[\u4E00-\u9FAF\u3400-\u4DBF\u3040-\u309F\u30A0-\u30FF]/g) || []).length;
+        const totalChars = text.replace(/\s+/g, '').length;
+        if (totalChars === 0) return false;
+        
+        return (kanjiKanaCount / totalChars) >= 0.5; 
+      });
+
+      const allText = (data.lines && data.lines.length > 0)
+        ? validLines.map(l => l.text).join('\n')
+        : (data.text || '');
+
+      if (!allText.trim()) {
+        log.push('No usable text detected');
       } else {
-        log.push(`Words found (${allWords.length}):`);
-        allWords.forEach(w => log.push(`  "${w.text}" — ${Math.round(w.confidence)}%`));
+        log.push(`Clean lines found: ${validLines.length}`);
+        log.push(`  "${allText.replace(/\s+/g, '').slice(0, 20)}..."`);
       }
 
-      // No confidence filter — use ALL detected text so we can see what's happening
-      const allText = allWords.map(w => w.text).join('');
       const kanji   = extractKanji(allText);
       log.push(`Kanji in text: [${kanji.join(', ') || 'none'}]`);
 
