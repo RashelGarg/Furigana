@@ -104,17 +104,16 @@ export default function CameraScreen({ navigation }) {
       const { data } = await worker.recognize(tmpCanvas);
       await worker.terminate();
 
-      // ── Balanced false-positive filtering ───────────────────────────────
-      // Confidence 70%: realistic for Japanese OCR (60 was too loose, 80 too strict)
-      const highConfWords = (data.words || []).filter(w => w.confidence > 70);
+      // ── False-positive filtering ─────────────────────────────────────────
+      // 65%: balanced for Japanese OCR on phone screens and printed text.
+      // The primary guard is the dictionary check below — random noise and
+      // background patterns almost never match our 3,138-kanji vocabulary.
+      const highConfWords = (data.words || []).filter(w => w.confidence > 65);
+      const highConfText  = highConfWords.map(w => w.text).join('');
 
-      // Require the filtered text to be at least 2 characters
-      // (single-char ghost reads are almost always noise)
-      const highConfText = highConfWords.map(w => w.text).join('');
-      if (highConfText.replace(/\s/g, '').length < 2) return;
-
-      // Must contain at least one kanji that's actually in our dictionary
-      const kanji = extractKanji(highConfText);
+      // Must contain at least one kanji that's actually in our dictionary.
+      // This handles single kanji (死, 山, etc.) and compounds alike.
+      const kanji   = extractKanji(highConfText);
       if (kanji.length === 0) return;
 
       const entries = kanji.map(k => lookupKanji(k)).filter(Boolean);
