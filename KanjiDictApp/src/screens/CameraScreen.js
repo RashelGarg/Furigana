@@ -104,21 +104,16 @@ export default function CameraScreen({ navigation }) {
       const { data } = await worker.recognize(tmpCanvas);
       await worker.terminate();
 
-      // ── Strict false-positive filtering ─────────────────────────────────
-      // 1. Only keep words with confidence > 80 (was 60 — too many ghost reads)
-      const highConfWords = (data.words || []).filter(w => w.confidence > 80);
+      // ── Balanced false-positive filtering ───────────────────────────────
+      // Confidence 70%: realistic for Japanese OCR (60 was too loose, 80 too strict)
+      const highConfWords = (data.words || []).filter(w => w.confidence > 70);
 
-      // 2. Require at least 2 high-confidence words — single isolated
-      //    characters from noise are almost never real text
-      if (highConfWords.length < 2) return;
-
-      // 3. Require that the overall page confidence is > 70
-      //    (data.confidence is the mean confidence across all words)
-      if ((data.confidence || 0) < 70) return;
-
+      // Require the filtered text to be at least 2 characters
+      // (single-char ghost reads are almost always noise)
       const highConfText = highConfWords.map(w => w.text).join('');
+      if (highConfText.replace(/\s/g, '').length < 2) return;
 
-      // 4. Must contain at least one kanji that's in our dictionary
+      // Must contain at least one kanji that's actually in our dictionary
       const kanji = extractKanji(highConfText);
       if (kanji.length === 0) return;
 
