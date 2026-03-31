@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 10,
   },
-  goSearchText: { color: '#4A3525', fontSize: 15, fontWeight: '600' },
+  goSearchText: { color: '#EDEDCE', fontSize: 15, fontWeight: '600' },
   header: {
     paddingHorizontal: 16,
     paddingVertical: 12,

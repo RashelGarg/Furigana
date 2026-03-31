@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
     minWidth: 32,
     alignItems: 'center',
   },
-  jlptBadgeText: { color: '#4A3525', fontSize: 11, fontWeight: '700' },
+  jlptBadgeText: { color: '#EDEDCE', fontSize: 11, fontWeight: '700' },
   jlptDesc: { fontSize: 12, width: 110 },
   jlptBar: {
     flex: 1,

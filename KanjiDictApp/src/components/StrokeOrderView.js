@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   replayText: {
-    color: '#4A3525',
+    color: '#EDEDCE',
     fontSize: 12,
     fontWeight: '600',
   },

@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 10,
   },
-  meaningNumText: { color: '#4A3525', fontSize: 12, fontWeight: '700' },
+  meaningNumText: { color: '#EDEDCE', fontSize: 12, fontWeight: '700' },
   meaningText: { fontSize: 15, flex: 1 },
   wordRow: {
     paddingVertical: 8,
