@@ -20,6 +20,7 @@ export default function CameraScreen({ navigation }) {
   const [frozen, setFrozen] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(null); // 0-100 or null
   const [sourceText, setSourceText] = useState(''); // full text for furigana display
+  const [ocrDebugLog, setOcrDebugLog] = useState([]); // on-screen debug info
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -76,6 +77,7 @@ export default function CameraScreen({ navigation }) {
     scanningRef.current = true;
     setScanning(true);
     setOcrProgress(0);
+    const log = [];
     try {
       const { createWorker } = await import('tesseract.js');
       const worker = await createWorker('jpn', 1, {
@@ -85,49 +87,60 @@ export default function CameraScreen({ navigation }) {
           }
         },
       });
-      // Preprocessing: draw greyscale version of the image to improve OCR accuracy
+      // Greyscale + contrast preprocessing
       const tmpCanvas = document.createElement('canvas');
       tmpCanvas.width = canvas.width;
       tmpCanvas.height = canvas.height;
       const ctx = tmpCanvas.getContext('2d');
       ctx.drawImage(canvas, 0, 0);
-      // Greyscale + contrast boost
       const imgData = ctx.getImageData(0, 0, tmpCanvas.width, tmpCanvas.height);
-      const d = imgData.data;
-      for (let i = 0; i < d.length; i += 4) {
-        const grey = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-        const contrast = Math.min(255, Math.max(0, (grey - 128) * 1.4 + 128));
-        d[i] = d[i + 1] = d[i + 2] = contrast;
+      const px = imgData.data;
+      for (let i = 0; i < px.length; i += 4) {
+        const grey = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
+        const c = Math.min(255, Math.max(0, (grey - 128) * 1.4 + 128));
+        px[i] = px[i + 1] = px[i + 2] = c;
       }
       ctx.putImageData(imgData, 0, 0);
 
-      const { data } = await worker.recognize(tmpCanvas);
+      const result = await worker.recognize(tmpCanvas);
       await worker.terminate();
+      const data = result.data;
 
-      // ── DEBUG: log raw OCR output to browser console ──────────────────────
-      console.log('[OCR] page confidence:', data.confidence);
-      console.log('[OCR] all words:', (data.words || []).map(w => `"${w.text}" (${Math.round(w.confidence)}%)`).join(', '));
-      console.log('[OCR] raw text:', data.text);
+      // ── On-screen debug info ──────────────────────────────────────────────
+      log.push(`Page confidence: ${Math.round(data.confidence || 0)}%`);
+      const allWords = data.words || [];
+      if (allWords.length === 0) {
+        log.push('No words detected at all');
+      } else {
+        log.push(`Words found (${allWords.length}):`);
+        allWords.forEach(w => log.push(`  "${w.text}" — ${Math.round(w.confidence)}%`));
+      }
 
-      // 65%: balanced for Japanese OCR on phone screens and printed text.
-      const highConfWords = (data.words || []).filter(w => w.confidence > 65);
-      console.log('[OCR] high-conf words (>65%):', highConfWords.map(w => `"${w.text}" (${Math.round(w.confidence)}%)`).join(', '));
-
-      const highConfText  = highConfWords.map(w => w.text).join('');
-      const kanji         = extractKanji(highConfText);
-      console.log('[OCR] kanji found:', kanji);
+      // No confidence filter — use ALL detected text so we can see what's happening
+      const allText = allWords.map(w => w.text).join('');
+      const kanji   = extractKanji(allText);
+      log.push(`Kanji in text: [${kanji.join(', ') || 'none'}]`);
 
       if (kanji.length === 0) {
-        console.log('[OCR] → blocked: no dictionary kanji in high-conf text');
+        log.push('→ No recognizable kanji found');
+        setOcrDebugLog([...log]);
         return;
       }
 
       const entries = kanji.map(k => lookupKanji(k)).filter(Boolean);
+      log.push(`Dictionary matches: ${entries.length}`);
+
       if (entries.length > 0) {
         setDetectedKanji(entries);
-        setSourceText(highConfText.trim());
+        setSourceText(allText.trim());
+        log.push('✓ Result displayed!');
+      } else {
+        log.push('→ Kanji found but not in dictionary');
       }
+      setOcrDebugLog([...log]);
     } catch (e) {
+      log.push(`Error: ${e.message}`);
+      setOcrDebugLog([...log]);
       console.error('OCR error:', e);
     } finally {
       scanningRef.current = false;
@@ -424,6 +437,22 @@ export default function CameraScreen({ navigation }) {
               ? 'Start the camera and point at Japanese text to detect kanji in real time'
               : 'Type or paste Japanese text above to extract and analyze kanji'}
           </Text>
+
+          {/* ── OCR Debug Panel ── */}
+          {ocrDebugLog.length > 0 && (
+            <View style={[styles.debugPanel, { backgroundColor: '#111', borderColor: '#333' }]}>
+              <Text style={styles.debugTitle}>📋 Last OCR Result</Text>
+              {ocrDebugLog.map((line, i) => (
+                <Text key={i} style={[
+                  styles.debugLine,
+                  line.startsWith('✓') && { color: '#4CAF50' },
+                  line.startsWith('→') && { color: '#FF5722' },
+                  line.startsWith('  ') && { color: '#aaa' },
+                ]}>{line}</Text>
+              ))}
+            </View>
+          )}
+
           <View style={styles.featurePills}>
             {['Real-time OCR', 'Furigana', 'Stroke Order', 'JLPT Levels', '3,138 Kanji'].map(f => (
               <View key={f} style={[styles.pill, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
@@ -591,4 +620,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   pillText: { fontSize: 12, fontWeight: '500' },
+  debugPanel: {
+    width: '100%',
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 12,
+    marginVertical: 12,
+  },
+  debugTitle: { color: '#FFF', fontSize: 13, fontWeight: '700', marginBottom: 8 },
+  debugLine: { color: '#FFF', fontSize: 11, fontFamily: 'monospace', lineHeight: 17 },
 });
