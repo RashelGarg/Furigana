@@ -163,16 +163,37 @@ export default function CameraScreen({ navigation }) {
     if (!video || !canvas || video.videoWidth === 0) return;
     // Stop auto-scan interval while frozen
     clearInterval(ocrIntervalRef.current);
-    // Draw current frame to canvas and show it
+    
+    // Draw full current frame to visible canvas so it looks frozen
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     canvas.getContext('2d').drawImage(video, 0, 0);
+    
     frozenRef.current = true;
     setFrozen(true);
     // Pause live video
     video.pause();
-    // OCR the frozen frame
-    await runOCR(canvas);
+
+    // ── Create mathematically cropped canvas for Tesseract ──
+    // Viewfinder dimensions: 80% width, 35% height, centered vertically
+    const cropCanvas = document.createElement('canvas');
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    const cropW = vw * 0.8;
+    const cropH = vh * 0.35;
+    const cropX = vw * 0.1;
+    const cropY = vh * 0.325;
+    
+    cropCanvas.width = cropW;
+    cropCanvas.height = cropH;
+    cropCanvas.getContext('2d').drawImage(
+      video,
+      cropX, cropY, cropW, cropH,
+      0, 0, cropW, cropH
+    );
+
+    // OCR only the targeted region!
+    await runOCR(cropCanvas);
   }, [runOCR]);
 
   // "Resume": unfreeze, restart live stream and interval
@@ -263,6 +284,21 @@ export default function CameraScreen({ navigation }) {
                 <Text style={[styles.cameraHintSub, { color: theme.textTertiary }]}>
                   Point at Japanese text to detect kanji
                 </Text>
+              </View>
+            )}
+
+            {/* Viewfinder Target Overlay */}
+            {cameraActive && (
+              <View style={StyleSheet.absoluteFill} pointerEvents="none">
+                <View style={styles.vfTop} />
+                <View style={styles.vfMiddleRow}>
+                  <View style={styles.vfSide} />
+                  <View style={[styles.vfCenter, { borderColor: theme.primary }]} />
+                  <View style={styles.vfSide} />
+                </View>
+                <View style={styles.vfBottom}>
+                  <Text style={styles.vfHelpText}>Align text inside box</Text>
+                </View>
               </View>
             )}
             {/* Frozen badge */}
@@ -497,6 +533,15 @@ const styles = StyleSheet.create({
   cameraIcon: { fontSize: 48, marginBottom: 12 },
   cameraHint: { fontSize: 15, fontWeight: '600', marginBottom: 4 },
   cameraHintSub: { fontSize: 13, textAlign: 'center' },
+  
+  // Viewfinder overlay styles
+  vfTop: { height: '32.5%', width: '100%', backgroundColor: 'rgba(0,0,0,0.55)' },
+  vfMiddleRow: { flexDirection: 'row', height: '35%', width: '100%' },
+  vfSide: { width: '10%', height: '100%', backgroundColor: 'rgba(0,0,0,0.55)' },
+  vfCenter: { width: '80%', height: '100%', borderWidth: 2.5, backgroundColor: 'transparent' },
+  vfBottom: { height: '32.5%', width: '100%', backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', paddingTop: 16 },
+  vfHelpText: { color: 'white', backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, overflow: 'hidden', fontSize: 13, fontWeight: '700' },
+  
   frozenBadge: {
     position: 'absolute',
     top: 10,
