@@ -6,7 +6,9 @@
     "start": "expo start --web",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "build:worddb": "node scripts/buildWordDB.js && node scripts/compactWordDB.js",
+    "build:worddetails": "node scripts/buildWordDetails.js"
   },
   "engines": {
     "node": ">=18.0.0"

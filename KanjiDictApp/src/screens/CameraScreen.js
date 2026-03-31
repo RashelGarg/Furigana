@@ -6,6 +6,7 @@ import {
 import { useTheme } from '../theme/ThemeContext';
 import { extractKanji, lookupKanji } from '../utils/kanjiUtils';
 import FuriganaText from '../components/FuriganaText';
+import { loadKuromoji, tokenize } from '../services/KuromojiService';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -31,6 +32,8 @@ export default function CameraScreen({ navigation }) {
 
   useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+    // Pre-load kuromoji so it's ready by the time user analyses text
+    if (Platform.OS === 'web') loadKuromoji().catch(() => {});
     return () => stopCamera();
   }, []);
 
