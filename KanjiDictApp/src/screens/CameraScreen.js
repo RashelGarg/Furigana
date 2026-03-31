@@ -87,20 +87,29 @@ export default function CameraScreen({ navigation }) {
           }
         },
       });
-      // Greyscale + contrast preprocessing
+
+      // ── Image preprocessing: binary threshold ─────────────────────────────
+      // Hard threshold works FAR better than greyscale+contrast for Japanese.
+      // Converts image to pure black-on-white which is what Tesseract expects.
       const tmpCanvas = document.createElement('canvas');
-      tmpCanvas.width = canvas.width;
+      tmpCanvas.width  = canvas.width;
       tmpCanvas.height = canvas.height;
       const ctx = tmpCanvas.getContext('2d');
       ctx.drawImage(canvas, 0, 0);
       const imgData = ctx.getImageData(0, 0, tmpCanvas.width, tmpCanvas.height);
       const px = imgData.data;
       for (let i = 0; i < px.length; i += 4) {
-        const grey = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
-        const c = Math.min(255, Math.max(0, (grey - 128) * 1.4 + 128));
-        px[i] = px[i + 1] = px[i + 2] = c;
+        const luma = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
+        // Binary threshold: dark pixels → black, light pixels → white
+        const bin = luma < 180 ? 0 : 255;
+        px[i] = px[i + 1] = px[i + 2] = bin;
+        px[i + 3] = 255;
       }
       ctx.putImageData(imgData, 0, 0);
+
+      // PSM 6 = "Assume a single uniform block of text"
+      // Much better than default PSM 3 for Japanese characters/blocks.
+      await worker.setParameters({ tessedit_pageseg_mode: '6' });
 
       const result = await worker.recognize(tmpCanvas);
       await worker.terminate();
