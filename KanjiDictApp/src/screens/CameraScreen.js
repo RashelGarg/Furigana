@@ -88,30 +88,7 @@ export default function CameraScreen({ navigation }) {
         },
       });
 
-      // ── Image preprocessing: binary threshold ─────────────────────────────
-      // Hard threshold works FAR better than greyscale+contrast for Japanese.
-      // Converts image to pure black-on-white which is what Tesseract expects.
-      const tmpCanvas = document.createElement('canvas');
-      tmpCanvas.width  = canvas.width;
-      tmpCanvas.height = canvas.height;
-      const ctx = tmpCanvas.getContext('2d');
-      ctx.drawImage(canvas, 0, 0);
-      const imgData = ctx.getImageData(0, 0, tmpCanvas.width, tmpCanvas.height);
-      const px = imgData.data;
-      for (let i = 0; i < px.length; i += 4) {
-        const luma = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
-        // Binary threshold: dark pixels → black, light pixels → white
-        const bin = luma < 180 ? 0 : 255;
-        px[i] = px[i + 1] = px[i + 2] = bin;
-        px[i + 3] = 255;
-      }
-      ctx.putImageData(imgData, 0, 0);
-
-      // PSM 6 = "Assume a single uniform block of text"
-      // Much better than default PSM 3 for Japanese characters/blocks.
-      await worker.setParameters({ tessedit_pageseg_mode: '6' });
-
-      const result = await worker.recognize(tmpCanvas);
+      const result = await worker.recognize(canvas);
       await worker.terminate();
       const data = result.data;
 
@@ -158,24 +135,10 @@ export default function CameraScreen({ navigation }) {
     }
   }, []);
 
-  // Periodic auto-scan: captures a frame and runs OCR (skipped if frozen or already scanning)
-  const autoCapture = useCallback(() => {
-    if (frozenRef.current || scanningRef.current) return;
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas || video.videoWidth === 0) return;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0);
-    runOCR(canvas);
-  }, [runOCR]);
-
   const startOCR = useCallback(() => {
     clearInterval(ocrIntervalRef.current);
-    // Run once immediately, then every 6s
-    autoCapture();
-    ocrIntervalRef.current = setInterval(autoCapture, 6000);
-  }, [autoCapture]);
+    // No longer auto-capturing. Wait for user to trigger OCR manually.
+  }, []);
 
   // "Capture Now": freeze the live video, show the snapshot, then OCR it
   const freezeAndOCR = useCallback(async () => {
