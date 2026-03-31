@@ -147,8 +147,9 @@ function buildAnimatedSVG(svgText, strokeColor, accentColor, speed) {
     const paths = svg.querySelectorAll('path');
     const totalStrokes = paths.length;
 
-    // Remove existing style/defs to avoid conflicts
+    // Remove existing style/defs/text to avoid conflicts
     svg.querySelectorAll('style').forEach(el => el.remove());
+    svg.querySelectorAll('text').forEach(el => el.remove());
 
     // Style each path for sequential animation
     let styleCSS = '';
