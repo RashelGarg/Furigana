@@ -8,3 +8,8 @@ if (fs.existsSync(indexPath)) {
   fs.writeFileSync(indexPath, content);
   console.log('Fixed absolute paths to relative paths in index.html');
 }
+
+// Create .nojekyll so GitHub Pages doesn't ignore the _expo folder
+const nojekyllPath = path.join(__dirname, '../dist/.nojekyll');
+fs.writeFileSync(nojekyllPath, '');
+console.log('Created .nojekyll in dist directory');
