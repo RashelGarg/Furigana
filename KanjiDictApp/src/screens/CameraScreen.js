@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Platform,
-  ActivityIndicator, ScrollView, Dimensions, Animated,
+  ActivityIndicator, ScrollView, Dimensions, Animated, useWindowDimensions
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { extractKanji, lookupKanji } from '../utils/kanjiUtils';
@@ -34,6 +34,8 @@ export default function CameraScreen({ navigation }) {
   const scanningRef = useRef(false);
   const frozenRef = useRef(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const { width: windowWidth } = useWindowDimensions();
+  const isLargeScreen = windowWidth >= 768;
 
   useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
@@ -273,8 +275,11 @@ export default function CameraScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      {/* Camera mode */}
-      {mode === 'camera' && Platform.OS === 'web' && (
+      <View style={[styles.contentContainer, { flexDirection: isLargeScreen ? 'row' : 'column' }]}>
+        {/* Left Side: Input (Camera or Text) */}
+        <View style={isLargeScreen ? styles.leftPanel : styles.fullLeftPanel}>
+          {/* Camera mode */}
+          {mode === 'camera' && Platform.OS === 'web' && (
         <View style={styles.cameraSection}>
           {/* Video / frozen canvas preview */}
           <View 
@@ -484,7 +489,10 @@ export default function CameraScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       )}
+        </View>
 
+        {/* Right Side: Output (Results or Hint) */}
+        <View style={isLargeScreen ? [styles.rightPanel, { borderColor: theme.border }] : styles.fullRightPanel}>
       {/* Results: furigana text + kanji tiles */}
       {detectedKanji.length > 0 && (
         <ScrollView style={styles.resultsSection} showsVerticalScrollIndicator={false}>
@@ -577,12 +585,19 @@ export default function CameraScreen({ navigation }) {
           </Text>
         </View>
       )}
+        </View>
+      </View>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  contentContainer: { flex: 1 },
+  leftPanel: { flex: 1, paddingRight: 8 },
+  rightPanel: { flex: 1, paddingLeft: 8, borderLeftWidth: 1 },
+  fullLeftPanel: { flex: 0 },
+  fullRightPanel: { flex: 1 },
   modeTabs: {
     flexDirection: 'row',
     margin: 16,
