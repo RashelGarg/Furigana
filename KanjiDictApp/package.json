@@ -2,7 +2,7 @@
   "name": "kanjidictapp",
   "version": "1.0.0",
   "main": "index.js",
-  "homepage": "https://RashelGarg.github.io/Furigana",
+  "homepage": "https://rashelgarg.tech/Furigana",
   "scripts": {
     "start": "expo start --web",
     "android": "expo start --android",
