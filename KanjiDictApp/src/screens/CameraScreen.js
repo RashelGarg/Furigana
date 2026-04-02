@@ -693,7 +693,7 @@ const styles = StyleSheet.create({
   controlBtnText: { color: '#EDEDCE', fontSize: 15, fontWeight: '600' },
   textSection: { paddingHorizontal: 12, paddingTop: 8, flex: 1 },
   inputLabel: { fontSize: 14, marginBottom: 8 },
-  demoScroll: { marginBottom: 10 },
+  demoScroll: { marginBottom: 10, flexGrow: 0, flexShrink: 0, maxHeight: 34 },
   demoChip: {
     paddingHorizontal: 12,
     paddingVertical: 6,
