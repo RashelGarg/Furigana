@@ -510,27 +510,29 @@ export default function CameraScreen({ navigation }) {
             </View>
           )}
 
-          {/* ── Individual kanji tiles ── */}
+          {/* ── Individual kanji list ── */}
           <Text style={[styles.resultsTitle, { color: theme.text }]}>
             Kanji ({detectedKanji.length}) — tap for details
           </Text>
-          <View style={styles.kanjiGrid}>
+          <View style={styles.kanjiList}>
             {detectedKanji.map((entry) => (
               <TouchableOpacity
                 key={entry.kanji}
-                style={[styles.kanjiTile, { backgroundColor: theme.surface, borderColor: theme.border }]}
+                style={[styles.kanjiListItem, { backgroundColor: theme.surface, borderColor: theme.border }]}
                 onPress={() => openDetail(entry)}
               >
-                <Text style={[styles.tileKanji, { color: theme.text }]}>{entry.kanji}</Text>
-                <Text style={[styles.tileFuri, { color: theme.primary }]}>
-                  {entry.kunyomi?.[0]?.split('.')[0] || entry.onyomi?.[0] || ''}
-                </Text>
-                <Text style={[styles.tileMeaning, { color: theme.textSecondary }]} numberOfLines={1}>
-                  {entry.meanings?.[0] || ''}
-                </Text>
+                <Text style={[styles.listItemKanji, { color: theme.text }]}>{entry.kanji}</Text>
+                <View style={styles.listItemContent}>
+                  <Text style={[styles.listItemFuri, { color: theme.primary }]}>
+                    {entry.kunyomi?.[0]?.split('.')[0] || entry.onyomi?.[0] || ' '}
+                  </Text>
+                  <Text style={[styles.listItemMeaning, { color: theme.textSecondary }]} numberOfLines={1}>
+                    {entry.meanings?.join(', ') || ''}
+                  </Text>
+                </View>
                 {entry.jlptLevel && (
-                  <View style={[styles.tileJLPT, { backgroundColor: theme.jlptColors[entry.jlptLevel] }]}>
-                    <Text style={styles.tileJLPTText}>{entry.jlptLevel}</Text>
+                  <View style={[styles.listItemJLPT, { backgroundColor: theme.jlptColors[entry.jlptLevel] }]}>
+                    <Text style={styles.listItemJLPTText}>{entry.jlptLevel}</Text>
                   </View>
                 )}
               </TouchableOpacity>
@@ -724,34 +726,26 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   resultsTitle: { fontSize: 13, fontWeight: '600', marginBottom: 10, opacity: 0.7 },
-  kanjiGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
+  kanjiList: {
+    gap: 8,
   },
-  kanjiTile: {
-    width: (SCREEN_W - 56) / 4,
-    minWidth: 70,
-    aspectRatio: 0.85,
+  kanjiListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
     borderRadius: 10,
     borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 6,
-    position: 'relative',
   },
-  tileKanji: { fontSize: 28, fontWeight: '400' },
-  tileFuri: { fontSize: 10, marginTop: 2, textAlign: 'center' },
-  tileMeaning: { fontSize: 9, marginTop: 2, textAlign: 'center' },
-  tileJLPT: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderRadius: 3,
+  listItemKanji: { fontSize: 24, fontWeight: '400', width: 40, textAlign: 'center' },
+  listItemContent: { flex: 1, justifyContent: 'center', paddingHorizontal: 12 },
+  listItemFuri: { fontSize: 13, marginBottom: 2, fontWeight: '500' },
+  listItemMeaning: { fontSize: 12, opacity: 0.9 },
+  listItemJLPT: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
-  tileJLPTText: { color: '#EDEDCE', fontSize: 8, fontWeight: '700' },
+  listItemJLPTText: { color: '#EDEDCE', fontSize: 10, fontWeight: '700' },
   hintSection: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 30 },
   hintTitle: { fontSize: 56, marginBottom: 16 },
   hintText: { fontSize: 15, textAlign: 'center', lineHeight: 22, marginBottom: 8 },
