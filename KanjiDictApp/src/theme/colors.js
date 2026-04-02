@@ -2,6 +2,11 @@ export const lightTheme = {
   background: '#EBF4F6', // Very Light Cyan
   surface: '#FFFFFF',
   surfaceAlt: '#DEE9EC', 
+  primary: '#088395', // Medium Teal
+  primaryLight: '#7AB2B2',
+  accent: '#EBF4F6',
+  accentLight: '#094050',
+  text: '#052C39', // Deep Ocean
   textSecondary: '#088395',
   textTertiary: '#7AB2B2',
   border: '#7AB2B2',

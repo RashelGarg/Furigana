@@ -465,8 +465,9 @@ export default function CameraScreen({ navigation }) {
               onChange={e => setInputText(e.target.value)}
               placeholder="東京大学で日本語を勉強しています。"
               style={{
+                flex: 1,
                 width: '100%',
-                minHeight: 100,
+                minHeight: 150,
                 fontSize: 18,
                 padding: 12,
                 borderRadius: 10,
@@ -690,7 +691,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   controlBtnText: { color: '#EDEDCE', fontSize: 15, fontWeight: '600' },
-  textSection: { paddingHorizontal: 12, paddingTop: 8 },
+  textSection: { paddingHorizontal: 12, paddingTop: 8, flex: 1 },
   inputLabel: { fontSize: 14, marginBottom: 8 },
   demoScroll: { marginBottom: 10 },
   demoChip: {
