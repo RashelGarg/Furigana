@@ -25,6 +25,9 @@ export default function CameraScreen({ navigation }) {
   const [ocrProgress, setOcrProgress] = useState(null); // 0-100 or null
   const [sourceText, setSourceText] = useState(''); // full text for furigana display
   const [ocrDebugLog, setOcrDebugLog] = useState([]); // on-screen debug info
+  
+  const [translatedText, setTranslatedText] = useState('');
+  const [isTranslating, setIsTranslating] = useState(false);
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -233,13 +236,95 @@ export default function CameraScreen({ navigation }) {
     startOCR();
   }, [startOCR]);
 
+  const translateText = async (text) => {
+    if (!text.trim()) return;
+    setIsTranslating(true);
+    try {
+      const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=ja|en`);
+      const data = await res.json();
+      if (data?.responseData?.translatedText) {
+        setTranslatedText(data.responseData.translatedText);
+      } else {
+        setTranslatedText("Translation failed or limited by API.");
+      }
+    } catch (e) {
+      console.error(e);
+      setTranslatedText("Error: Could not reach translation service.");
+    }
+    setIsTranslating(false);
+  };
+
   const handleAnalyzeText = () => {
-    const text = inputText.trim();
-    if (!text) return;
-    const kanji = extractKanji(text);
+    // Trim unnecessary enter spaces
+    const cleanText = inputText.trim();
+    if (!cleanText) return;
+    setInputText(cleanText);
+
+    const kanji = extractKanji(cleanText);
     const entries = kanji.map(k => lookupKanji(k)).filter(Boolean);
     setDetectedKanji(entries);
-    setSourceText(text);
+    setSourceText(cleanText);
+    translateText(cleanText);
+  };
+
+  const handlePdfUpload = async () => {
+    if (Platform.OS !== 'web') return;
+    const el = document.createElement('input');
+    el.type = 'file';
+    el.accept = 'application/pdf';
+    el.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const fileReader = new FileReader();
+        fileReader.onload = async function() {
+          const typedarray = new Uint8Array(this.result);
+          if (!window.pdfjsLib) {
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js';
+            document.head.appendChild(script);
+            await new Promise(resolve => script.onload = resolve);
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+          }
+          try {
+            const pdf = await window.pdfjsLib.getDocument(typedarray).promise;
+            let fullText = '';
+            for (let i = 1; i <= pdf.numPages; i++) {
+              const page = await pdf.getPage(i);
+              const textContent = await page.getTextContent();
+              const pageText = textContent.items.map(item => item.str).join(' ');
+              fullText += pageText + '\n';
+            }
+            // remove multiple empty lines
+            const formatted = fullText.replace(/\n\s*\n/g, '\n\n').trim();
+            setInputText(formatted);
+          } catch(e) {
+            console.error('PDF Parse Error:', e);
+            alert('Could not parse PDF file.');
+          }
+        };
+        fileReader.readAsArrayBuffer(file);
+      }
+    };
+    el.click();
+  };
+
+  const downloadPDF = async () => {
+    if (Platform.OS !== 'web') return;
+    if (!window.html2pdf) {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+      document.head.appendChild(script);
+      await new Promise(resolve => script.onload = resolve);
+    }
+    const element = document.getElementById('furigana-output-block');
+    if (element) {
+      window.html2pdf().from(element).set({
+        margin: 10,
+        filename: 'Furigana_Translation.pdf',
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      }).save();
+    }
   };
 
   const openDetail = (entry) => {
@@ -483,12 +568,22 @@ export default function CameraScreen({ navigation }) {
             />
           ) : null}
 
-          <TouchableOpacity
-            style={[styles.analyzeBtn, { backgroundColor: theme.primary }]}
-            onPress={handleAnalyzeText}
-          >
-            <Text style={styles.analyzeBtnText}>Analyze Text →</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+            <TouchableOpacity
+              style={[styles.analyzeBtn, { backgroundColor: theme.primary, flex: 1, marginTop: 0 }]}
+              onPress={handleAnalyzeText}
+            >
+              <Text style={styles.analyzeBtnText}>Analyze Text →</Text>
+            </TouchableOpacity>
+            {Platform.OS === 'web' && (
+              <TouchableOpacity
+                style={[styles.uploadBtn, { backgroundColor: theme.surfaceAlt, borderColor: theme.border, borderWidth: 1 }]}
+                onPress={handlePdfUpload}
+              >
+                <Text style={[styles.uploadBtnText, { color: theme.text }]}>📄 Upload PDF</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       )}
         </View>
@@ -498,18 +593,41 @@ export default function CameraScreen({ navigation }) {
       {/* Results: furigana text */}
       {detectedKanji.length > 0 && (
         <ScrollView style={styles.resultsSection} showsVerticalScrollIndicator={false}>
-          {/* ── Furigana text block ── */}
-          {sourceText.length > 0 && (
-            <View style={[styles.furiganaCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-              <Text style={[styles.furiganaLabel, { color: theme.textSecondary }]}>Furigana</Text>
-              <FuriganaText
-                text={sourceText}
-                fontSize={22}
-                color={theme.text}
-                rtColor={theme.primary}
-              />
-            </View>
-          )}
+          <View id="furigana-output-block">
+            {/* ── Furigana text block ── */}
+            {sourceText.length > 0 && (
+              <View style={[styles.furiganaCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                <View style={[styles.cardHeader, { marginBottom: 6 }]}>
+                  <Text style={[styles.furiganaLabel, { color: theme.textSecondary, marginBottom: 0 }]}>Furigana</Text>
+                  {Platform.OS === 'web' && (
+                    <TouchableOpacity onPress={downloadPDF} style={styles.pdfBtn}>
+                      <Text style={[styles.pdfBtnText, { color: theme.primary }]}>💾 Download PDF</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <FuriganaText
+                  text={sourceText}
+                  fontSize={22}
+                  color={theme.text}
+                  rtColor={theme.primary}
+                />
+              </View>
+            )}
+
+            {/* ── Translation text block ── */}
+            {sourceText.length > 0 && (
+              <View style={[styles.furiganaCard, { backgroundColor: theme.surfaceAlt, borderColor: theme.border, marginTop: 16 }]}>
+                 <Text style={[styles.furiganaLabel, { color: theme.textSecondary }]}>English Translation</Text>
+                 {isTranslating ? (
+                   <ActivityIndicator size="small" color={theme.primary} />
+                 ) : (
+                   <Text style={{ fontSize: 16, color: theme.text, lineHeight: 24 }}>
+                     {translatedText || "No translation generated."}
+                   </Text>
+                 )}
+              </View>
+            )}
+          </View>
         </ScrollView>
       )}
 
@@ -700,6 +818,25 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   controlBtnText: { color: '#EDEDCE', fontSize: 15, fontWeight: '600' },
+  uploadBtn: {
+    borderRadius: 10,
+    paddingVertical: 13,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  uploadBtnText: { fontSize: 15, fontWeight: '600' },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  pdfBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+  pdfBtnText: { fontSize: 12, fontWeight: '600' },
   textSection: { paddingHorizontal: 12, paddingTop: 8, flex: 1 },
   inputLabel: { fontSize: 14, marginBottom: 8 },
   demoScroll: { marginBottom: 10, flexGrow: 0, flexShrink: 0, maxHeight: 34 },

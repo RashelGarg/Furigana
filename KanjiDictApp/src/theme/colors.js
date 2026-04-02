@@ -14,11 +14,11 @@ export const lightTheme = {
   success: '#088395',
   warning: '#D4A017',
   jlptColors: {
-    N5: '#7AB2B2',
-    N4: '#088395',
-    N3: '#09637E',
-    N2: '#B8860B',
-    N1: '#8B0000',
+    N5: '#2196F3', // Blue
+    N4: '#4CAF50', // Green
+    N3: '#FFC107', // Amber/Yellow
+    N2: '#FF9800', // Orange
+    N1: '#F44336', // Red
   },
   tabBar: '#EBF4F6',
   tabBarBorder: 'transparent',
@@ -47,11 +47,11 @@ export const darkTheme = {
   success: '#088395',
   warning: '#D4A017',
   jlptColors: {
-    N5: '#EBF4F6',
-    N4: '#7AB2B2',
-    N3: '#088395',
-    N2: '#B8860B',
-    N1: '#8B0000',
+    N5: '#2196F3',
+    N4: '#4CAF50',
+    N3: '#FFC107',
+    N2: '#FF9800',
+    N1: '#F44336',
   },
   tabBar: '#052C39',
   tabBarBorder: 'transparent',
