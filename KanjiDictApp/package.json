@@ -8,7 +8,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "predeploy": "npx expo export -p web",
+    "predeploy": "npx expo export -p web && node scripts/fix-paths.js",
     "deploy": "gh-pages -d dist",
     "build:worddb": "node scripts/buildWordDB.js && node scripts/compactWordDB.js",
     "build:worddetails": "node scripts/buildWordDetails.js"
