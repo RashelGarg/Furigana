@@ -255,6 +255,7 @@ export default function CameraScreen({ navigation }) {
 
   return (
     <Animated.View style={[styles.container, { backgroundColor: theme.background, opacity: fadeAnim }]}>
+      <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
       {/* Mode tabs */}
       <View style={[styles.modeTabs, { backgroundColor: theme.surface, borderColor: theme.border }]}>
         <TouchableOpacity
@@ -275,7 +276,7 @@ export default function CameraScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      <View style={[styles.contentContainer, { flexDirection: isLargeScreen ? 'row' : 'column' }]}>
+      <View style={[styles.contentContainer, { flexDirection: isLargeScreen ? 'row' : 'column', minHeight: isLargeScreen ? 350 : 'auto' }]}>
         {/* Left Side: Input (Camera or Text) */}
         <View style={isLargeScreen ? styles.leftPanel : styles.fullLeftPanel}>
           {/* Camera mode */}
@@ -494,7 +495,7 @@ export default function CameraScreen({ navigation }) {
 
         {/* Right Side: Output (Results or Hint) */}
         <View style={isLargeScreen ? [styles.rightPanel, { borderColor: theme.border }] : styles.fullRightPanel}>
-      {/* Results: furigana text + kanji tiles */}
+      {/* Results: furigana text */}
       {detectedKanji.length > 0 && (
         <ScrollView style={styles.resultsSection} showsVerticalScrollIndicator={false}>
           {/* ── Furigana text block ── */}
@@ -509,38 +510,10 @@ export default function CameraScreen({ navigation }) {
               />
             </View>
           )}
-
-          {/* ── Individual kanji list ── */}
-          <Text style={[styles.resultsTitle, { color: theme.text }]}>
-            Kanji ({detectedKanji.length}) — tap for details
-          </Text>
-          <View style={styles.kanjiList}>
-            {detectedKanji.map((entry) => (
-              <TouchableOpacity
-                key={entry.kanji}
-                style={[styles.kanjiListItem, { backgroundColor: theme.surface, borderColor: theme.border }]}
-                onPress={() => openDetail(entry)}
-              >
-                <Text style={[styles.listItemKanji, { color: theme.text }]}>{entry.kanji}</Text>
-                <View style={styles.listItemContent}>
-                  <Text style={[styles.listItemFuri, { color: theme.primary }]}>
-                    {entry.kunyomi?.[0]?.split('.')[0] || entry.onyomi?.[0] || ' '}
-                  </Text>
-                  <Text style={[styles.listItemMeaning, { color: theme.textSecondary }]} numberOfLines={1}>
-                    {entry.meanings?.join(', ') || ''}
-                  </Text>
-                </View>
-                {entry.jlptLevel && (
-                  <View style={[styles.listItemJLPT, { backgroundColor: theme.jlptColors[entry.jlptLevel] }]}>
-                    <Text style={styles.listItemJLPTText}>{entry.jlptLevel}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-          <View style={{ height: 40 }} />
         </ScrollView>
       )}
+
+
 
       {detectedKanji.length === 0 && !scanning && (
         <View style={styles.hintSection}>
@@ -590,6 +563,40 @@ export default function CameraScreen({ navigation }) {
       )}
         </View>
       </View>
+
+      {/* Centered Bottom Kanji List */}
+      {detectedKanji.length > 0 && (
+        <View style={styles.bottomListWrapper}>
+          <Text style={[styles.resultsTitle, { color: theme.text }]}>
+            Kanji ({detectedKanji.length}) — tap for details
+          </Text>
+          <View style={styles.kanjiList}>
+            {detectedKanji.map((entry) => (
+              <TouchableOpacity
+                key={entry.kanji}
+                style={[styles.kanjiListItem, { backgroundColor: theme.surface, borderColor: theme.border }]}
+                onPress={() => openDetail(entry)}
+              >
+                <Text style={[styles.listItemKanji, { color: theme.text }]}>{entry.kanji}</Text>
+                <View style={styles.listItemContent}>
+                  <Text style={[styles.listItemFuri, { color: theme.primary }]}>
+                    {entry.kunyomi?.[0]?.split('.')[0] || entry.onyomi?.[0] || ' '}
+                  </Text>
+                  <Text style={[styles.listItemMeaning, { color: theme.textSecondary }]} numberOfLines={1}>
+                    {entry.meanings?.join(', ') || ''}
+                  </Text>
+                </View>
+                {entry.jlptLevel && (
+                  <View style={[styles.listItemJLPT, { backgroundColor: theme.jlptColors[entry.jlptLevel] }]}>
+                    <Text style={styles.listItemJLPTText}>{entry.jlptLevel}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
+      </ScrollView>
     </Animated.View>
   );
 }
@@ -724,6 +731,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     textTransform: 'uppercase',
     marginBottom: 6,
+  },
+  bottomListWrapper: {
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: 600,
+    paddingHorizontal: 16,
+    paddingTop: 24,
   },
   resultsTitle: { fontSize: 13, fontWeight: '600', marginBottom: 10, opacity: 0.7 },
   kanjiList: {
